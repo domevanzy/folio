@@ -2,6 +2,19 @@ import { afterEach, describe, it, expect, vi } from "vitest";
 import { api, requestApi, notebookUrl, sourceUrl } from "@/lib/client/api";
 afterEach(() => vi.unstubAllGlobals());
 describe("shared browser API transport", () => {
+  it("forwards request cancellation to fetch", async () => {
+    const fetch = vi.fn().mockResolvedValue(Response.json({ ok: true }));
+    vi.stubGlobal("fetch", fetch);
+    const signal = new AbortController().signal;
+    await requestApi(
+      "/api/notebooks/test/chat",
+      "POST",
+      { question: "Budget?" },
+      { signal },
+    );
+    expect(fetch.mock.calls[0][1].signal).toBe(signal);
+  });
+
   it("encodes JSON while leaving multipart boundaries to the browser", async () => {
     const fetch = vi
       .fn()

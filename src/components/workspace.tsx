@@ -471,7 +471,12 @@ export function Workspace({
               </div>
             ) : (
               messages.map((m) => (
-                <ChatMessage key={m.id} message={m} onCitation={cite} />
+                <ChatMessage
+                  key={m.id}
+                  message={m}
+                  onCitation={cite}
+                  status={chatStatus}
+                />
               ))
             )}
             <div ref={bottom} />

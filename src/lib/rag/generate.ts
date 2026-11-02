@@ -65,6 +65,11 @@ export async function generateGroundedAnswer({
     if (event.type === "error") throw event.error;
     if (event.type === "abort")
       throw new DOMException("Generation aborted", "AbortError");
+    if (
+      event.type === "finish" &&
+      (event.finishReason === "error" || event.finishReason === "interrupted")
+    )
+      throw new Error("Unvollständiger Modell-Stream");
     if (event.type !== "text-delta") continue;
     pending += event.text;
     if (content.length + pending.length > 50000)

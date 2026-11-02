@@ -4,7 +4,7 @@
 
 - `npm run lint` — keine Fehler oder Warnungen.
 - `npm run typecheck` — TypeScript strict ohne Fehler.
-- `npm test` — **37 Tests bestanden**, ein zusätzlicher Supabase-Cloudtest übersprungen.
+- `npm test` — **48 Tests bestanden**, ein zusätzlicher Supabase-Cloudtest übersprungen.
 - Lokale PostgreSQL-/pgvector-Integration: unveränderte Migration erfolgreich ausgeführt; echte Datenbankrollen, RLS, Suchfilter, Fremdschlüssel, Storage-Regeln und atomare Limits geprüft.
 - PDF-Extraktion mit echten generierten mehrseitigen PDF-Dateien; Seitenzuordnung, beschädigte Dateien, Größen- und Seitenlimits geprüft.
 - Chunking, Überlappung und Quellenvalidierung geprüft.
@@ -29,3 +29,9 @@
 ## Bekannte Audit-Befunde
 
 Der vollständige Entwicklungs-Audit meldet 16 moderate Befunde im ESLint-/minimatch-Abhängigkeitsbaum. Die angebotene automatische Hauptversionsänderung wäre mit der gewählten Next.js-Lintkonfiguration inkompatibel; sie wurde nicht erzwungen. Die Produktionsabhängigkeiten waren ohne Befund. Details und funktionale Einschränkungen stehen in README.md.
+
+## Chat-Fehleranalyse und GitHub-Workflow
+
+Die beiden Beispielquellen im betroffenen Notebook sind bereit; vier Chunks und die gestellte Benutzerfrage wurden gespeichert. Der direkte Gemini-3.8-Test lieferte HTTP 503 (Anbieterüberlastung). Das Modell bleibt unverändert. Chat-Fehlerauswertung, Statusereignisse, Zeitlimits und Abbrechen sind implementiert. Regressionstests verwenden den echten AI-SDK-Stream mit dessen Test-Provider für 503, Teilantworten, ausbleibende Inhalte und Abbruch. Die erfolgreiche Live-KI-Antwort steht wegen der Anbieterüberlastung weiterhin aus.
+
+Das private GitHub-Repository verwendet Issue → PR → Tests → Merge, dokumentierte Namen und automatisierte Prüfungen.

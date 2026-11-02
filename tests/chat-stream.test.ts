@@ -10,6 +10,17 @@ async function collect(stream: ReadableStream<Uint8Array>) {
   return events;
 }
 describe("shared chat stream protocol", () => {
+  it("carries progress stages through the shared protocol", async () => {
+    const event: ChatEvent = { type: "status", stage: "generating" };
+    const stream = new ReadableStream<Uint8Array>({
+      start(c) {
+        c.enqueue(encodeChatEvent(event));
+        c.close();
+      },
+    });
+    expect(await collect(stream)).toEqual([event]);
+  });
+
   it("decodes UTF-8 and events across arbitrary byte boundaries", async () => {
     const events: ChatEvent[] = [
       { type: "text", text: "Überprüfbar [C1]." },
