@@ -1,0 +1,17 @@
+name: Funktion ergänzen
+description: Gewünschtes Verhalten beschreiben
+title: "[Feature] "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Ziel und Nutzen
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Überprüfbare Akzeptanzkriterien
+    validations:
+      required: true
