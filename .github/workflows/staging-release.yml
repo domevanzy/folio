@@ -125,7 +125,8 @@ jobs:
             jq -r '"::error::Unexpected deployment state: \(.readyState), target: \(.target)"' <<< "$deployment"
             exit 1
           fi
-          echo "url=$url" >> "$GITHUB_OUTPUT"
+          deployment_id=$(jq -er '.id | select(test("^dpl_[a-zA-Z0-9]+$"))' <<< "$deployment")
+          echo "id=$deployment_id" >> "$GITHUB_OUTPUT"
 
       - name: Apply pending migrations
         env:
@@ -183,11 +184,25 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_TEAM_ID }}
-          DEPLOYMENT_URL: ${{ steps.production-build.outputs.url }}
+          DEPLOYMENT_ID: ${{ steps.production-build.outputs.id }}
         run: |
           current=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')
           if [[ "$current" != "$GITHUB_SHA" ]]; then
             echo "::error::Production moved during the release. The staged deployment was not promoted."
             exit 1
           fi
-          npx --yes vercel@65.4.0 promote "$DEPLOYMENT_URL" --token "$VERCEL_TOKEN" --timeout 5m
+          curl --fail --silent --show-error --max-time 30 \
+            -H "Authorization: Bearer $VERCEL_TOKEN" -H 'Content-Type: application/json' \
+            -d '{}' "https://api.vercel.com/v10/projects/$VERCEL_PROJECT_ID/promote/$DEPLOYMENT_ID?teamId=$VERCEL_ORG_ID" >/dev/null
+          for ((attempt = 0; attempt < 30; attempt++)); do
+            project=$(curl --fail --silent --show-error --max-time 30 \
+              -H "Authorization: Bearer $VERCEL_TOKEN" \
+              "https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID?teamId=$VERCEL_ORG_ID")
+            if jq -e --arg id "$DEPLOYMENT_ID"               '.targets.production.id == $id and .lastAliasRequest.jobStatus == "succeeded"'               <<< "$project" >/dev/null; then
+              echo "Production deployment promoted: $DEPLOYMENT_ID"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::Vercel did not confirm promotion of $DEPLOYMENT_ID."
+          exit 1
