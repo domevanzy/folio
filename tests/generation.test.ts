@@ -82,6 +82,43 @@ describe("real AI SDK stream handling with test provider", () => {
       "validating",
     ]);
   });
+  it("previews complete words and replaces an unsupported draft", async () => {
+    modelWith([
+      { type: "text-start", id: "answer" },
+      { type: "text-delta", id: "answer", delta: "Das Bud" },
+      { type: "text-delta", id: "answer", delta: "get beträgt " },
+      {
+        type: "text-delta",
+        id: "answer",
+        delta: "180.000 Euro [C1].\n\nOhne ",
+      },
+      { type: "text-delta", id: "answer", delta: "Beleg." },
+      { type: "text-end", id: "answer" },
+      finish,
+    ]);
+    const events: [string, string][] = [];
+    const content = await generateGroundedAnswer({
+      ...options(),
+      onDraft: (text) => events.push(["draft", text]),
+      onText: (text) => events.push(["text", text]),
+    });
+    expect(events).toEqual([
+      ["draft", "Das "],
+      ["draft", "Budget beträgt "],
+      ["text", "Das Budget beträgt 180.000 Euro [C1].\n\n"],
+      ["draft", "Ohne "],
+      [
+        "text",
+        "Für diesen Abschnitt liegt keine überprüfbare Quellenbasis vor.\n\n",
+      ],
+    ]);
+    expect(content).toBe(
+      events
+        .filter(([type]) => type === "text")
+        .map(([, text]) => text)
+        .join(""),
+    );
+  });
   it("streams one separated notice for consecutive paragraphs without references", async () => {
     modelWith([
       { type: "text-start", id: "answer" },
