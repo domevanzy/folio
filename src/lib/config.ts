@@ -1,5 +1,5 @@
 export const config = {
-  chatModel: process.env.GEMINI_CHAT_MODEL || "gemini-3.8-flash",
+  chatModel: process.env.GEMINI_CHAT_MODEL || "gemini-3.5-flash-lite",
   embeddingModel: process.env.GEMINI_EMBEDDING_MODEL || "gemini-embedding-001",
   dimensions: 768,
   maxBytes: 4 * 1024 * 1024,

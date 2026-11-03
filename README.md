@@ -53,7 +53,7 @@ In Google AI Studio einen API-Key erstellen, die Gemini API für das Projekt akt
 | `NEXT_PUBLIC_SUPABASE_URL`             | Öffentlich   | Supabase-Projekt-URL                                       |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Öffentlich   | Veröffentlichbarer Schlüssel; RLS ist die Zugriffsschranke |
 | `GOOGLE_GENERATIVE_AI_API_KEY`         | Nur Server   | Gemini API-Key                                             |
-| `GEMINI_CHAT_MODEL`                    | Nur Server   | Default `gemini-3.8-flash`                                 |
+| `GEMINI_CHAT_MODEL`                    | Nur Server   | Default `gemini-3.5-flash-lite`                                 |
 | `GEMINI_EMBEDDING_MODEL`               | Nur Server   | Default `gemini-embedding-001`                             |
 
 Modelle, Suchschwelle, Chunk-/Datei-/Seitenlimits und Embedding-Dimension stehen zentral in `src/lib/config.ts`. Query- und Dokument-Embeddings verwenden die jeweiligen Retrieval-Task-Typen. Es werden **768 Dimensionen** angefordert; SQL und HNSW-Index sind darauf abgestimmt. Bei Modell-/Dimensionswechsel alle Dokumente neu einlesen und ggf. das Schema migrieren. Embeddings unterschiedlicher Modelle nicht mischen.
