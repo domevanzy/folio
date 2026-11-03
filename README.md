@@ -193,13 +193,13 @@ Kein Deployment wurde allein durch die lokale Implementierung veröffentlicht. E
 - [Vercel AI SDK: Google-Provider und Embeddings](https://ai-sdk.dev/providers/ai-sdk-providers/google)
 - [Gemini Embeddings](https://ai.google.dev/gemini-api/docs/embeddings)
 
-### Datenbankprüfung beim Staging-Deploy
+### Automatische Releases
 
 GitHub Actions erstellt den Vercel-Preview-Build für den Staging-Commit.
 Erst nach `Ready` folgen Migrationen, bei geänderten Funktionsdateien oder
 geänderter Supabase-Konfiguration Edge Functions und die lesende Schemaprüfung.
 Die Preview kann erreichbar sein, bevor die Datenbankschritte abgeschlossen
-sind. Maßgeblich ist der erfolgreiche GitHub-Workflow **Staging release**.
+sind. Maßgeblich ist der erfolgreiche GitHub-Workflow **Folio release**.
 
 Vor Aktivierung unter **GitHub → Settings → Secrets and variables → Actions**
 die folgenden Repository-Einstellungen hinterlegen:
@@ -218,7 +218,7 @@ Vor dem ersten Lauf die Migrationshistorie abgleichen. Wenn `001_folio.sql`
 bereits manuell eingespielt wurde, nach Prüfung des tatsächlichen Schemas die
 Migration als angewendet eintragen. Bei leerem Schema spielt der Workflow sie
 ein. Bei einem Abbruch kann der Workflow für den aktuellen Branch erneut
-gestartet werden. Production wird separat umgestellt.
+gestartet werden.
 
 Den Session-Pooler-Host findest du im Staging-Projekt unter **Connect**.
 Sonderzeichen im Datenbankpasswort müssen URL-kodiert sein. Das CA-Zertifikat
@@ -227,3 +227,24 @@ vollständigen PEM-Text in GitHub. Die Schemaprüfung verwendet denselben
 Zugang wie `supabase db push` in einer Read-only-Transaktion.
 
 Unter **GitHub → Actions → Staging release** steht das Ergebnis.
+
+
+#### Production
+
+Ein Merge nach `main` startet den Production-Release. GitHub Actions erstellt
+zuerst einen Production-Build ohne Domain-Zuweisung. Erst nach `Ready`
+aktualisiert der Workflow Supabase, prüft das Schema und schaltet den
+vorbereiteten Build für die Live-Domain frei.
+
+Vor dem ersten Merge nach `main` die Production-Werte als GitHub Actions
+Secrets anlegen: `PRODUCTION_DB_MIGRATION_URL`,
+`PRODUCTION_SCHEMA_DATABASE_CA` und `PRODUCTION_SUPABASE_PROJECT_REF`.
+Das Production-Supabase-Projekt muss vom Staging-Projekt getrennt sein.
+`PRODUCTION_SUPABASE_ACCESS_TOKEN` wird erst bei Edge Functions benötigt.
+Vercel-Zugang und Projekt-IDs werden gemeinsam verwendet.
+
+Vor der Aktivierung den Production-Migrationsstand prüfen. Wenn die
+initiale Migration bereits manuell ausgeführt wurde, nach Prüfung des
+Schemas nur den fehlenden Eintrag in der Migrationshistorie nachtragen.
+Migrationen und Funktionsänderungen müssen mit dem bisherigen Live-Build
+kompatibel sein, solange die neue Version noch vorbereitet wird.
