@@ -24,10 +24,19 @@ async function checkStagingSchema() {
     throw new Error("Staging-Datenbank-URL und Supabase-Projekt-URL prüfen.");
   }
 
-  if (database.protocol !== "postgresql:" ||
-      !database.hostname.endsWith(".pooler.supabase.com") ||
-      database.username !== `folio_schema_check.${project}`) {
-    throw new Error("Session-Pooler und folio_schema_check für dasselbe Staging-Projekt verwenden.");
+  if (!["postgresql:", "postgres:"].includes(database.protocol)) {
+    throw new Error("STAGING_SCHEMA_DATABASE_URL braucht postgresql:// oder postgres://.");
+  }
+  if (!database.hostname.endsWith(".pooler.supabase.com") ||
+      (database.port && database.port !== "5432")) {
+    throw new Error("STAGING_SCHEMA_DATABASE_URL braucht den Supabase Session-Pooler auf Port 5432.");
+  }
+  const username = decodeURIComponent(database.username);
+  if (!username.startsWith("folio_schema_check.")) {
+    throw new Error("Der Pooler-Benutzer muss folio_schema_check.<projekt-ref> sein.");
+  }
+  if (username !== `folio_schema_check.${project}`) {
+    throw new Error("Die Projekt-Ref im Pooler-Benutzernamen stimmt nicht mit NEXT_PUBLIC_SUPABASE_URL überein.");
   }
 
   const sql = await readFile(new URL("./check-staging-schema.sql", import.meta.url), "utf8");
@@ -35,7 +44,7 @@ async function checkStagingSchema() {
     host: database.hostname,
     port: 5432,
     database: "postgres",
-    user: database.username,
+    user: username,
     password: decodeURIComponent(database.password),
     ssl: { rejectUnauthorized: true },
     connectionTimeoutMillis: 10_000,
@@ -64,6 +73,6 @@ async function checkStagingSchema() {
 try {
   await checkStagingSchema();
 } catch (error) {
-  console.error(`Supabase Staging: ${error.message}`);
+  console.error(`Supabase Staging: ${error instanceof URIError ? "URL-Kodierung von Benutzer oder Passwort prüfen." : error.message}`);
   process.exitCode = 1;
 }
