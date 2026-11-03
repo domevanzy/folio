@@ -1,0 +1,16 @@
+name: Wartungsaufgabe
+description: Eine konkrete technische oder dokumentarische Aufgabe
+title: "[Task] "
+body:
+  - type: textarea
+    id: task
+    attributes:
+      label: Aufgabe und Anlass
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Überprüfbare Akzeptanzkriterien
+    validations:
+      required: true

@@ -1,0 +1,17 @@
+name: Fehler melden
+description: Ein konkretes Fehlverhalten beheben
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem und Schritte zur Reproduktion
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Erwartetes Verhalten und Akzeptanzkriterien
+    validations:
+      required: true
