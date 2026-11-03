@@ -28,7 +28,7 @@ const schema = z.object({
 });
 export async function answer(
   request: Request,
-  notebookId: string,
+  requestedNotebookId: string,
   summary = false,
 ) {
   const cancellation = new AbortController();
@@ -39,7 +39,11 @@ export async function answer(
   ]);
   let releaseSlot: (() => Promise<void>) | undefined;
   try {
-    const { db, user } = await notebookContext(notebookId, request);
+    const { db, user, notebook } = await notebookContext(
+      requestedNotebookId,
+      request,
+    );
+    const notebookId = notebook.id;
     releaseSlot = await acquireRequestSlot(db, "model");
     await rateLimit(db, summary ? "summary" : "chat");
     const body = schema.parse(await readJson(request));
@@ -53,6 +57,7 @@ export async function answer(
         .from("sources")
         .select(fields)
         .eq("notebook_id", notebookId)
+        .eq("user_id", user.id)
         .eq("status", "ready")
         .in("id", body.sourceIds)
         .abortSignal(signal)
@@ -73,6 +78,7 @@ export async function answer(
           .from("document_chunks")
           .select("source_id,page_number,content,chunk_index")
           .eq("notebook_id", notebookId)
+          .eq("user_id", user.id)
           .in("source_id", body.sourceIds)
           .order("chunk_index")
           .limit(9600)
@@ -121,6 +127,7 @@ export async function answer(
         .select("role,content")
         .eq("conversation_id", conversation.id)
         .eq("notebook_id", notebookId)
+        .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(8)
         .abortSignal(signal),

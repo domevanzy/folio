@@ -1,4 +1,8 @@
-import { documentStorage, removeDocumentFiles } from "@/lib/storage";
+import {
+  documentPath,
+  documentStorage,
+  removeDocumentFiles,
+} from "@/lib/storage";
 import {
   isValidPdfFile,
   PDF_UPLOAD_ERROR,
@@ -26,8 +30,9 @@ export async function POST(
 ) {
   let releaseSlot: (() => Promise<void>) | undefined;
   try {
-    const { id } = await params;
-    const { db, user } = await notebookContext(id, request);
+    const { id: requestedId } = await params;
+    const { db, user, notebook } = await notebookContext(requestedId, request);
+    const id = notebook.id;
     releaseSlot = await acquireRequestSlot(db, "upload");
     await rateLimit(db, "upload");
     google();
@@ -68,7 +73,7 @@ export async function POST(
         "Zu viel Text. Bitte teile die Quelle in kleinere Abschnitte.",
       );
     const sourceId = crypto.randomUUID();
-    const path = file ? `${user.id}/${id}/${sourceId}.pdf` : null;
+    const path = file ? documentPath(user.id, id, sourceId) : null;
     checked(
       await db.from("sources").insert({
         id: sourceId,
@@ -109,12 +114,19 @@ export async function POST(
           .from("sources")
           .update({ status: "ready" })
           .eq("id", sourceId)
+          .eq("notebook_id", id)
+          .eq("user_id", user.id)
           .select("id,name,status,page_count,error,created_at")
           .single(),
       );
       return Response.json({ ...data, kind }, { status: 201 });
     } catch (error) {
-      await db.from("document_chunks").delete().eq("source_id", sourceId);
+      await db
+        .from("document_chunks")
+        .delete()
+        .eq("source_id", sourceId)
+        .eq("notebook_id", id)
+        .eq("user_id", user.id);
       if (path) await removeDocumentFiles(db, [path]).catch(() => {});
       await db
         .from("sources")
@@ -123,7 +135,9 @@ export async function POST(
           error:
             "Verarbeitung fehlgeschlagen. Bitte löschen und erneut hochladen.",
         })
-        .eq("id", sourceId);
+        .eq("id", sourceId)
+        .eq("notebook_id", id)
+        .eq("user_id", user.id);
       throw error;
     }
   } catch (error) {
