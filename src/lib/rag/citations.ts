@@ -15,10 +15,13 @@ export function validateCitations(text: string, allowed: Citation[]) {
   });
   return { content, citations: [...used].map((id) => map.get(id)!), rejected };
 }
+export const missingParagraphEvidence =
+  "Für diesen Abschnitt liegt keine überprüfbare Quellenbasis vor.\n\n";
+
 /** Each streamed paragraph must carry a known reference; ungrounded paragraphs are withheld. */
 export function groundedParagraph(text: string, allowed: Citation[]) {
   const validated = validateCitations(text, allowed);
   return validated.citations.length
     ? validated.content
-    : "Für diesen Abschnitt liegt keine überprüfbare Quellenbasis vor.\n";
+    : missingParagraphEvidence;
 }

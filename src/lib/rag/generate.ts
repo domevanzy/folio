@@ -3,7 +3,7 @@ import { streamText, type ModelMessage } from "ai";
 import { google } from "./model";
 import { config } from "@/lib/config";
 import { systemPrompt } from "./retrieval";
-import { groundedParagraph } from "./citations";
+import { groundedParagraph, missingParagraphEvidence } from "./citations";
 import type { Citation } from "@/lib/types";
 import type { ChatStatus } from "@/lib/chat-stream";
 type Options = {
@@ -54,8 +54,10 @@ export async function generateGroundedAnswer({
   let content = "";
   let pending = "";
   const flush = (paragraph: string) => {
+    if (!paragraph.trim()) return;
     onStatus("validating");
     const safe = groundedParagraph(paragraph, citations);
+    if (safe === missingParagraphEvidence && content.endsWith(safe)) return;
     content += safe;
     onText(safe);
   };

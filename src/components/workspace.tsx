@@ -8,6 +8,10 @@ import {
   ArrowUp,
   Check,
   ChevronRight,
+  ChevronDown,
+  Globe,
+  TextCursorInput,
+  Clock,
   FileText,
   Layers2,
   Loader2,
@@ -19,7 +23,13 @@ import {
   X,
   PanelLeft,
 } from "lucide-react";
-import type { Citation, Message, Notebook, Source } from "@/lib/types";
+import type {
+  Citation,
+  Message,
+  Notebook,
+  Source,
+  SourcePreview,
+} from "@/lib/types";
 import { Button } from "./ui/button";
 import { Brand } from "./brand";
 import { api, requestApi, notebookUrl, sourceUrl } from "@/lib/client/api";
@@ -30,6 +40,7 @@ import {
   type ChatStatus,
 } from "@/lib/chat-stream";
 import { PdfViewer, type PdfDocument } from "./notebook/pdf-viewer";
+import { AddSourceDialog } from "./notebook/add-source-dialog";
 import { StudioPanel } from "./notebook/studio-panel";
 import { ChatMessage } from "./notebook/chat-message";
 import { PanelHeader } from "./notebook/panel-header";
@@ -68,11 +79,26 @@ export function Workspace({
     },
     [],
   );
-  const [uploading, setUploading] = useState(false);
+  const [pendingSources, setPendingSources] = useState<
+    { id: number; name: string }[]
+  >([]);
+  const sourceUploadInProgress = useRef(false);
+  const [sourceErrors, setSourceErrors] = useState<string[]>([]);
+  const uploading = pendingSources.length > 0;
+  const sourceCount = sources.length + pendingSources.length;
   const [error, setError] = useState("");
   const [drag, setDrag] = useState(false);
   const [tab, setTab] = useState("chat");
+  const [addingSource, setAddingSource] = useState<"text" | "web" | null>(null);
+  const [sourceMenuOpen, setSourceMenuOpen] = useState(false);
+  const sourceMenuTrigger = useRef<HTMLButtonElement>(null);
   const [viewer, setViewer] = useState<PdfDocument | null>(null);
+  const [writtenViewer, setWrittenViewer] = useState<{
+    name: string;
+    excerpt?: string;
+    content: string;
+    originalUrl: string | null;
+  } | null>(null);
   const [viewLoading, setViewLoading] = useState(false);
   const [deleteSource, setDeleteSource] = useState<Source | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -84,34 +110,54 @@ export function Workspace({
     bottom.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
   useEffect(() => {
-    if (!sources.some((s) => s.status === "processing")) return;
+    if (uploading || !sources.some((s) => s.status === "processing")) return;
     const timer = setInterval(() => router.refresh(), 8000);
     return () => clearInterval(timer);
-  }, [sources, router]);
-  async function upload(file?: File) {
-    if (!file || uploading) return;
-    setError("");
-    if (!isValidPdfFile(file)) {
-      setError(PDF_UPLOAD_ERROR);
-      return;
-    }
-    setUploading(true);
-    const form = new FormData();
-    form.set("file", file);
+  }, [sources, router, uploading]);
+  function upload(files: FileList) {
+    void addSources(
+      Array.from(files, (file) => ({ name: file.name, body: file })),
+    );
+  }
+
+  async function addSources(entries: { name: string; body: object }[]) {
+    if (!entries.length || sourceUploadInProgress.current || busy) return;
+    sourceUploadInProgress.current = true;
+    setAddingSource(null);
+    setSourceMenuOpen(false);
+    setSourceErrors([]);
+    setPendingSources(entries.map(({ name }, id) => ({ id, name })));
     try {
-      const data = await api<Source>(
-        notebookUrl(notebook.id, "/sources"),
-        "POST",
-        form,
-      );
-      setSources((prev) => [...prev, data]);
-      setSelected((prev) => new Set([...prev, data.id]));
-      router.refresh();
-    } catch (e) {
-      setError((e as Error).message);
+      for (const { name, body } of entries) {
+        try {
+          let payload = body;
+          if (body instanceof File) {
+            if (!isValidPdfFile(body)) throw new Error(PDF_UPLOAD_ERROR);
+            const form = new FormData();
+            form.set("file", body);
+            payload = form;
+          }
+          const data = await api<Source>(
+            notebookUrl(notebook.id, "/sources"),
+            "POST",
+            payload,
+          );
+          setSources((prev) =>
+            prev.some((source) => source.id === data.id)
+              ? prev
+              : [...prev, data],
+          );
+          setSelected((prev) => new Set([...prev, data.id]));
+        } catch (e) {
+          const message = (e as Error).message;
+          setSourceErrors((prev) => [...prev, `${name}: ${message}`]);
+        } finally {
+          setPendingSources((prev) => prev.slice(1));
+        }
+      }
       router.refresh();
     } finally {
-      setUploading(false);
+      sourceUploadInProgress.current = false;
       if (input.current) input.current.value = "";
     }
   }
@@ -125,12 +171,14 @@ export function Workspace({
       const seq = ++viewerSeq.current;
       setViewLoading(true);
       try {
-        const { url } = await api<{ url: string }>(
+        const preview = await api<SourcePreview>(
           sourceUrl(notebook.id, sourceId),
           "GET",
         );
-        if (seq === viewerSeq.current)
-          setViewer({ sourceId, name, page, url, excerpt, excerptPage: page });
+        if (seq !== viewerSeq.current) return;
+        if (preview.kind === "pdf")
+          setViewer({ name, page, url: preview.url });
+        else setWrittenViewer({ name, excerpt, ...preview });
       } catch (e) {
         setError((e as Error).message);
       } finally {
@@ -174,7 +222,7 @@ export function Workspace({
       const response = await requestApi(
         notebookUrl(notebook.id, summary ? "/summary" : "/chat"),
         "POST",
-        { question: text, sourceIds: [...selected] },
+        { question: summary ? undefined : text, sourceIds: [...selected] },
         { signal },
       );
       if (response.headers.get("content-type")?.includes("application/json")) {
@@ -227,7 +275,7 @@ export function Workspace({
           <div className="desktop-only">
             <Brand />
           </div>
-          <span className="desktop-only text-[#c6cec1]">/</span>
+          <span className="desktop-only text-[#bbc5d4]">/</span>
           <Link
             href="/"
             title="Alle Notebooks"
@@ -240,7 +288,7 @@ export function Workspace({
               {notebook.title}
             </h1>
             <p className="muted mt-1 text-[10px]">
-              {sources.length} Quellen · Privates Notebook
+              {sourceCount} Quellen · Privates Notebook
             </p>
           </div>
         </div>
@@ -290,35 +338,78 @@ export function Workspace({
           onDrop={(e) => {
             e.preventDefault();
             setDrag(false);
-            upload(e.dataTransfer.files[0]);
+            upload(e.dataTransfer.files);
           }}
         >
           <PanelHeader icon={PanelLeft} title="Quellen">
-            <span className="muted rounded-md bg-[#f5f6f2] px-2 py-0.5 text-[10px]">
-              {sources.length}
+            <span className="muted rounded-md bg-[#f2f4f6] px-2 py-0.5 text-[10px]">
+              {sourceCount}
             </span>
           </PanelHeader>
           <div className="p-4">
-            <Button
-              variant="outline"
-              className="w-full rounded-full"
-              disabled={uploading || busy}
-              onClick={() => input.current?.click()}
+            <div
+              className="relative"
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget))
+                  setSourceMenuOpen(false);
+              }}
+              onKeyDown={(event) => {
+                if (event.key !== "Escape" || !sourceMenuOpen) return;
+                event.stopPropagation();
+                setSourceMenuOpen(false);
+                sourceMenuTrigger.current?.focus();
+              }}
             >
-              {uploading ? (
-                <Loader2 className="spinner" size={16} />
-              ) : (
-                <Plus size={16} />
-              )}{" "}
-              {uploading ? "PDF wird verarbeitet …" : "Quelle hinzufügen"}
-            </Button>
+              <Button
+                ref={sourceMenuTrigger}
+                variant="outline"
+                className="w-full rounded-full"
+                disabled={uploading || busy}
+                aria-expanded={sourceMenuOpen}
+                onClick={() => setSourceMenuOpen(!sourceMenuOpen)}
+              >
+                <Plus size={16} aria-hidden="true" />
+                Quelle hinzufügen
+                <ChevronDown size={14} aria-hidden="true" />
+              </Button>
+              {sourceMenuOpen && (
+                <ul className="absolute inset-x-0 top-full z-20 mt-2 rounded-xl border border-[var(--border)] bg-white p-1 shadow-lg">
+                  {(
+                    [
+                      ["pdf", FileText, "PDFs hochladen"],
+                      ["text", TextCursorInput, "Text einfügen"],
+                      ["web", Globe, "Webseite per URL"],
+                    ] as const
+                  ).map(([kind, Icon, label]) => (
+                    <li key={kind}>
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-start gap-3 px-3"
+                        onClick={() => {
+                          sourceMenuTrigger.current?.focus();
+                          setSourceMenuOpen(false);
+                          if (kind === "pdf") input.current?.click();
+                          else setAddingSource(kind);
+                        }}
+                      >
+                        <Icon size={16} aria-hidden="true" />
+                        {label}
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
             <input
               ref={input}
               className="hidden"
               type="file"
+              multiple
               accept="application/pdf,.pdf"
               aria-label="PDF hochladen"
-              onChange={(e) => upload(e.target.files?.[0])}
+              onChange={(e) => {
+                if (e.target.files) upload(e.target.files);
+              }}
             />
           </div>
           {ready.length > 0 && (
@@ -326,7 +417,7 @@ export function Workspace({
               Alle Quellen auswählen
               <input
                 type="checkbox"
-                className="accent-[#426043]"
+                className="accent-[#3f4d63]"
                 checked={ready.every((s) => selected.has(s.id))}
                 disabled={busy}
                 onChange={(e) =>
@@ -340,30 +431,38 @@ export function Workspace({
             </label>
           )}
           <div
-            className={`min-h-0 flex-1 overflow-auto px-3 ${drag ? "bg-[#edf4e5]" : ""}`}
+            className={`min-h-0 flex-1 overflow-auto px-3 ${drag ? "bg-[#e6ebf3]" : ""}`}
           >
             {sources.length ? (
               sources.map((s) => (
                 <div
                   key={s.id}
-                  className="group mb-2 rounded-xl p-3 hover:bg-[#f7f8f4]"
+                  className="group mb-2 rounded-xl p-3 hover:bg-[#f4f6f8]"
                 >
                   <div className="flex items-center gap-2.5">
-                    <FileText
-                      size={17}
-                      className={
-                        s.status === "failed"
-                          ? "text-red-600"
-                          : "text-[#7d936a]"
-                      }
-                    />
+                    {s.status === "processing" ? (
+                      <Loader2
+                        aria-hidden="true"
+                        size={17}
+                        className="shrink-0 text-blue-700 motion-safe:animate-spin"
+                      />
+                    ) : (
+                      <FileText
+                        size={17}
+                        className={
+                          s.status === "failed"
+                            ? "text-red-600"
+                            : "text-[#63799a]"
+                        }
+                      />
+                    )}
                     <button
                       disabled={s.status !== "ready"}
                       onClick={(event) => {
                         event.currentTarget.focus();
                         void showSource(s.id, s.name);
                       }}
-                      className="min-w-0 flex-1 wrap-anywhere text-left text-xs font-medium enabled:underline enabled:decoration-[#a7b59f] enabled:underline-offset-2"
+                      className="min-w-0 flex-1 wrap-anywhere text-left text-xs font-medium enabled:underline enabled:decoration-[#97a6bd] enabled:underline-offset-2"
                       title={s.name}
                     >
                       {s.name}
@@ -371,7 +470,7 @@ export function Workspace({
                     <input
                       type="checkbox"
                       aria-label={`${s.name} als Quelle auswählen`}
-                      className="size-5 shrink-0 accent-[#426043]"
+                      className="size-5 shrink-0 accent-[#3f4d63]"
                       disabled={s.status !== "ready" || busy}
                       checked={selected.has(s.id)}
                       onChange={(e) => {
@@ -387,7 +486,11 @@ export function Workspace({
                       className={`text-[10px] ${s.status === "failed" ? "text-red-700" : "muted"}`}
                     >
                       {s.status === "ready"
-                        ? `${s.page_count} Seiten · Bereit`
+                        ? s.kind === "pdf"
+                          ? `${s.page_count} Seiten · Bereit`
+                          : s.kind === "web"
+                            ? "Webseite · Bereit"
+                            : "Text · Bereit"
                         : s.status === "processing"
                           ? "Wird verarbeitet …"
                           : "Verarbeitung fehlgeschlagen"}
@@ -396,7 +499,7 @@ export function Workspace({
                       aria-label={`${s.name} löschen`}
                       disabled={busy || uploading}
                       onClick={() => setDeleteSource(s)}
-                      className="rounded p-1 text-[#9b9f95] hover:text-red-700"
+                      className="rounded p-1 text-[#8496b0] hover:text-red-700"
                     >
                       <Trash2 size={12} />
                     </button>
@@ -408,24 +511,70 @@ export function Workspace({
                   )}
                 </div>
               ))
-            ) : (
+            ) : !uploading && !sourceErrors.length ? (
               <div className="flex h-full min-h-56 flex-col items-center justify-center px-5 pb-10 text-center">
-                <span className="mb-5 flex size-16 items-center justify-center rounded-2xl border border-dashed border-[#cbd6c1] bg-[#f6f8f2]">
-                  <UploadCloud size={25} className="text-[#8da07a]" />
+                <span className="mb-5 flex size-16 items-center justify-center rounded-2xl border border-dashed border-[#c0c9d7] bg-[#f2f4f8]">
+                  <UploadCloud size={25} className="text-[#7488a6]" />
                 </span>
                 <h3 className="text-sm font-medium">
                   Alles beginnt mit einer Quelle.
                 </h3>
                 <p className="muted mt-3 text-xs leading-6">
-                  Ziehe deine PDF hierher oder füge sie über den Button hinzu.
+                  Ziehe eine PDF hierher oder füge eine PDF, einen Text oder
+                  eine Webseite hinzu.
                 </p>
-                <p className="mt-4 text-[10px] text-[#9aA18f]">
+                <p className="mt-4 text-[10px] text-[#8193af]">
                   PDF · bis 4 MiB · bis 100 Seiten
                 </p>
               </div>
+            ) : null}
+            {pendingSources.map(({ id, name }, index) => {
+              const active = index === 0;
+              const Icon = active ? Loader2 : Clock;
+              return (
+                <div key={id} role="status" className="mb-2 rounded-xl p-3">
+                  <div className="flex items-center gap-2.5">
+                    <Icon
+                      aria-hidden="true"
+                      size={17}
+                      className={
+                        active
+                          ? "shrink-0 text-blue-700 motion-safe:animate-spin"
+                          : "muted shrink-0 motion-safe:animate-pulse"
+                      }
+                    />
+                    <span className="min-w-0 wrap-anywhere text-xs font-medium">
+                      {name}
+                    </span>
+                  </div>
+                  <p className="muted ml-7 mt-2 text-[10px]">
+                    {active
+                      ? "Quelle wird verarbeitet …"
+                      : "Wartet auf Verarbeitung"}
+                  </p>
+                </div>
+              );
+            })}
+            {sourceErrors.length > 0 && (
+              <div
+                role="alert"
+                className="mb-3 flex items-start gap-2 rounded-xl bg-red-50 p-3 text-xs text-red-800"
+              >
+                <ul className="min-w-0 flex-1 space-y-1 wrap-anywhere">
+                  {sourceErrors.map((message, index) => (
+                    <li key={index}>{message}</li>
+                  ))}
+                </ul>
+                <button
+                  aria-label="Fehlermeldungen schließen"
+                  onClick={() => setSourceErrors([])}
+                >
+                  <X size={14} />
+                </button>
+              </div>
             )}
           </div>
-          <div className="border-t border-[#eef0ea] p-4 text-[10px] leading-5 muted">
+          <div className="border-t border-[#eaecf0] p-4 text-[10px] leading-5 muted">
             Nur ausgewählte Quellen werden für deine Antworten verwendet.
           </div>
         </section>
@@ -434,8 +583,8 @@ export function Workspace({
         >
           <PanelHeader icon={MessageSquare} title="Chat">
             {" "}
-            <span className="flex items-center gap-1.5 rounded-full bg-[#f1f5eb] px-2.5 py-1 text-[9px] text-[#6c8557]">
-              <span className="size-1.5 rounded-full bg-[#8ea874]" />{" "}
+            <span className="flex items-center gap-1.5 rounded-full bg-[#eceff4] px-2.5 py-1 text-[9px] text-[#546988]">
+              <span className="size-1.5 rounded-full bg-[#7088ac]" />{" "}
               Quellenbasiert
             </span>
           </PanelHeader>
@@ -445,10 +594,10 @@ export function Workspace({
           >
             {messages.length === 0 ? (
               <div className="mx-auto flex h-full max-w-md flex-col items-start justify-center py-8">
-                <div className="mb-6 flex size-14 items-center justify-center rounded-2xl bg-[#edf2e5] text-[#79965d]">
+                <div className="mb-6 flex size-14 items-center justify-center rounded-2xl bg-[#e6eaf1] text-[#59739a]">
                   <Layers2 size={27} />
                 </div>
-                <p className="mb-3 text-[9px] font-semibold tracking-[.18em] text-[#94a187]">
+                <p className="mb-3 text-[9px] font-semibold tracking-[.18em] text-[#7c8fac]">
                   DEIN WISSEN HAT ANTWORTEN.
                 </p>
                 <h2 className="serif text-[34px] leading-tight">
@@ -470,7 +619,7 @@ export function Workspace({
                       key={t}
                       disabled={!selected.size || busy}
                       onClick={() => ask(t)}
-                      className="flex w-full items-center justify-between gap-4 rounded-xl border border-[#e7ebe1] px-4 py-3 text-left text-[11px] text-[#6e7d64] hover:bg-[#f5f7f1] disabled:opacity-50"
+                      className="flex w-full items-center justify-between gap-4 rounded-xl border border-[#e2e5ea] px-4 py-3 text-left text-[11px] text-[#586c89] hover:bg-[#f1f3f7] disabled:opacity-50"
                     >
                       {t}
                       <ChevronRight size={13} />
@@ -510,7 +659,7 @@ export function Workspace({
                 e.preventDefault();
                 ask();
               }}
-              className="rounded-2xl border border-[#dbe3d2] bg-[#fbfcf8] p-3 shadow-sm"
+              className="rounded-2xl border border-[#d3d9e2] bg-[#f8fafc] p-3 shadow-sm"
             >
               <textarea
                 rows={2}
@@ -528,7 +677,7 @@ export function Workspace({
                 placeholder={
                   selected.size
                     ? "Stelle eine Frage zu deinen Quellen …"
-                    : "Wähle zuerst eine PDF-Quelle aus …"
+                    : "Wähle zuerst eine Quelle aus …"
                 }
                 className="w-full resize-none rounded-md bg-transparent p-1 text-xs leading-6"
               />
@@ -552,7 +701,7 @@ export function Workspace({
                 </Button>
               </div>
             </form>
-            <p className="mt-2.5 text-center text-[9px] text-[#969e90]">
+            <p className="mt-2.5 text-center text-[9px] text-[#8092ae]">
               KI kann Fehler machen. Überprüfe wichtige Aussagen anhand der
               Quellen.
             </p>
@@ -567,19 +716,76 @@ export function Workspace({
       {viewLoading && (
         <div
           role="status"
-          className="fixed bottom-5 left-1/2 z-50 flex -translate-x-1/2 gap-2 rounded-full bg-[#253f35] px-5 py-3 text-xs text-white shadow-xl"
+          className="fixed bottom-5 left-1/2 z-50 flex -translate-x-1/2 gap-2 rounded-full bg-[#232f41] px-5 py-3 text-xs text-white shadow-xl"
         >
           <Loader2 size={15} className="spinner" />
           Dokument wird geöffnet …
         </div>
       )}
+      {addingSource && (
+        <AddSourceDialog
+          onClose={() => setAddingSource(null)}
+          kind={addingSource}
+          onAdd={(source) =>
+            void addSources([
+              {
+                name: source.kind === "text" ? source.name : source.url,
+                body: source,
+              },
+            ])
+          }
+        />
+      )}
+      {writtenViewer && (
+        <Modal
+          titleId="written-source-title"
+          onClose={() => setWrittenViewer(null)}
+        >
+          <div className="flex items-start gap-3">
+            <h2
+              id="written-source-title"
+              className="min-w-0 flex-1 wrap-anywhere text-lg font-semibold"
+            >
+              {writtenViewer.name}
+            </h2>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Quelle schließen"
+              onClick={() => setWrittenViewer(null)}
+            >
+              <X size={19} />
+            </Button>
+          </div>
+          {writtenViewer.originalUrl && (
+            <a
+              href={writtenViewer.originalUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-sm underline"
+            >
+              Webseite öffnen
+            </a>
+          )}
+          <div className="mt-4 max-h-[60dvh] space-y-4 overflow-auto">
+            {writtenViewer.excerpt && (
+              <div className="rounded-lg bg-neutral-100 p-3">
+                <h3 className="mb-1 font-semibold">Zitierter Auszug</h3>
+                <p className="whitespace-pre-wrap wrap-anywhere">
+                  {writtenViewer.excerpt}
+                </p>
+              </div>
+            )}
+            <p className="whitespace-pre-wrap wrap-anywhere">
+              {writtenViewer.content}
+            </p>
+          </div>
+        </Modal>
+      )}
       {viewer && (
         <PdfViewer
           key={viewer.url}
           document={viewer}
-          pageCount={
-            sources.find((s) => s.id === viewer.sourceId)?.page_count || 100
-          }
           onClose={() => {
             viewerSeq.current++;
             setViewer(null);

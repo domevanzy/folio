@@ -1,3 +1,5 @@
+import type { SourceKind } from "@/lib/types";
+import { missingSourceKind } from "@/lib/http";
 import {
   encodeChatEvent,
   CHAT_STREAM_CONTENT_TYPE,
@@ -10,6 +12,7 @@ import { chatFailure } from "@/lib/chat-errors";
 import {
   notebookContext,
   rateLimit,
+  acquireRequestSlot,
   checked,
   readJson,
   HttpError,
@@ -25,7 +28,7 @@ const schema = z.object({
 });
 export async function answer(
   request: Request,
-  notebookId: string,
+  requestedNotebookId: string,
   summary = false,
 ) {
   const cancellation = new AbortController();
@@ -34,8 +37,14 @@ export async function answer(
     cancellation.signal,
     AbortSignal.timeout(config.chatRequestTimeoutMs),
   ]);
+  let releaseSlot: (() => Promise<void>) | undefined;
   try {
-    const { db, user } = await notebookContext(notebookId, request);
+    const { db, user, notebook } = await notebookContext(
+      requestedNotebookId,
+      request,
+    );
+    const notebookId = notebook.id;
+    releaseSlot = await acquireRequestSlot(db, "model");
     await rateLimit(db, summary ? "summary" : "chat");
     const body = schema.parse(await readJson(request));
     if (!summary && !body.question)
@@ -43,14 +52,22 @@ export async function answer(
     const question = summary
       ? "Erstelle eine strukturierte Zusammenfassung der vorliegenden Auszüge. Nenne zentrale Themen, Kernaussagen und offene Fragen. Kennzeichne die Zusammenfassung ausdrücklich als auszugbasiert und möglicherweise unvollständig."
       : body.question!;
-    const { data: sources } = checked(
-      await db
+    const listSources = (fields: string) =>
+      db
         .from("sources")
-        .select("id,name")
+        .select(fields)
         .eq("notebook_id", notebookId)
+        .eq("user_id", user.id)
         .eq("status", "ready")
         .in("id", body.sourceIds)
-        .abortSignal(signal),
+        .abortSignal(signal)
+        .overrideTypes<
+          Array<{ id: string; name: string; kind?: SourceKind }>,
+          { merge: false }
+        >();
+    const result = await listSources("id,name,kind");
+    const { data: sources } = checked(
+      missingSourceKind(result.error) ? await listSources("id,name") : result,
     );
     if (sources?.length !== new Set(body.sourceIds).size)
       throw new HttpError(400, "Mindestens eine Quelle ist nicht verfügbar.");
@@ -61,6 +78,7 @@ export async function answer(
           .from("document_chunks")
           .select("source_id,page_number,content,chunk_index")
           .eq("notebook_id", notebookId)
+          .eq("user_id", user.id)
           .in("source_id", body.sourceIds)
           .order("chunk_index")
           .limit(9600)
@@ -89,6 +107,7 @@ export async function answer(
     const { citations, context } = makeContext(
       rows,
       new Map(sources.map((s) => [s.id, s.name])),
+      new Map(sources.map((s) => [s.id, s.kind ?? "pdf"])),
     );
     const { data: conversation } = checked(
       await db
@@ -108,6 +127,7 @@ export async function answer(
         .select("role,content")
         .eq("conversation_id", conversation.id)
         .eq("notebook_id", notebookId)
+        .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(8)
         .abortSignal(signal),
@@ -149,6 +169,7 @@ export async function answer(
       const saved = await persist(content);
       return Response.json({ content, ...saved });
     }
+    const releaseStreamSlot = releaseSlot;
     const stream = new ReadableStream({
       async start(controller) {
         let connected = true;
@@ -164,12 +185,10 @@ export async function answer(
           const content = await generateGroundedAnswer({
             question,
             context,
-            history: (history || [])
-              .reverse()
-              .map((m) => ({
-                role: m.role as "user" | "assistant",
-                content: m.content,
-              })),
+            history: (history || []).reverse().map((m) => ({
+              role: m.role as "user" | "assistant",
+              content: m.content,
+            })),
             citations,
             signal,
             onText: (text) => send({ type: "text", text }),
@@ -186,13 +205,15 @@ export async function answer(
             error: failed.message + " Die Antwort wurde nicht gespeichert.",
           });
         } finally {
-          if (connected) controller.close();
+          await releaseStreamSlot();
+          if (connected && !cancellation.signal.aborted) controller.close();
         }
       },
       cancel() {
         cancellation.abort();
       },
     });
+    releaseSlot = undefined;
     return new Response(stream, {
       headers: {
         "Content-Type": CHAT_STREAM_CONTENT_TYPE,
@@ -209,5 +230,7 @@ export async function answer(
       return failure(error);
     const failed = chatFailure(signal.aborted ? signal.reason : error);
     return Response.json({ error: failed.message }, { status: failed.status });
+  } finally {
+    await releaseSlot?.();
   }
 }
