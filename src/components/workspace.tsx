@@ -8,6 +8,9 @@ import {
   ArrowUp,
   Check,
   ChevronRight,
+  ChevronDown,
+  Globe,
+  TextCursorInput,
   Clock,
   FileText,
   Layers2,
@@ -86,7 +89,9 @@ export function Workspace({
   const [error, setError] = useState("");
   const [drag, setDrag] = useState(false);
   const [tab, setTab] = useState("chat");
-  const [addingSource, setAddingSource] = useState(false);
+  const [addingSource, setAddingSource] = useState<"text" | "web" | null>(null);
+  const [sourceMenuOpen, setSourceMenuOpen] = useState(false);
+  const sourceMenuTrigger = useRef<HTMLButtonElement>(null);
   const [viewer, setViewer] = useState<PdfDocument | null>(null);
   const [writtenViewer, setWrittenViewer] = useState<{
     name: string;
@@ -118,7 +123,8 @@ export function Workspace({
   async function addSources(entries: { name: string; body: object }[]) {
     if (!entries.length || sourceUploadInProgress.current || busy) return;
     sourceUploadInProgress.current = true;
-    setAddingSource(false);
+    setAddingSource(null);
+    setSourceMenuOpen(false);
     setSourceErrors([]);
     setPendingSources(entries.map(({ name }, id) => ({ id, name })));
     try {
@@ -341,14 +347,59 @@ export function Workspace({
             </span>
           </PanelHeader>
           <div className="p-4">
-            <Button
-              variant="outline"
-              className="w-full rounded-full"
-              disabled={uploading || busy}
-              onClick={() => setAddingSource(true)}
+            <div
+              className="relative"
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget))
+                  setSourceMenuOpen(false);
+              }}
+              onKeyDown={(event) => {
+                if (event.key !== "Escape" || !sourceMenuOpen) return;
+                event.stopPropagation();
+                setSourceMenuOpen(false);
+                sourceMenuTrigger.current?.focus();
+              }}
             >
-              <Plus size={16} /> Quelle hinzufügen
-            </Button>
+              <Button
+                ref={sourceMenuTrigger}
+                variant="outline"
+                className="w-full rounded-full"
+                disabled={uploading || busy}
+                aria-expanded={sourceMenuOpen}
+                onClick={() => setSourceMenuOpen(!sourceMenuOpen)}
+              >
+                <Plus size={16} aria-hidden="true" />
+                Quelle hinzufügen
+                <ChevronDown size={14} aria-hidden="true" />
+              </Button>
+              {sourceMenuOpen && (
+                <ul className="absolute inset-x-0 top-full z-20 mt-2 rounded-xl border border-[var(--border)] bg-white p-1 shadow-lg">
+                  {(
+                    [
+                      ["pdf", FileText, "PDFs hochladen"],
+                      ["text", TextCursorInput, "Text einfügen"],
+                      ["web", Globe, "Webseite per URL"],
+                    ] as const
+                  ).map(([kind, Icon, label]) => (
+                    <li key={kind}>
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-start gap-3 px-3"
+                        onClick={() => {
+                          sourceMenuTrigger.current?.focus();
+                          setSourceMenuOpen(false);
+                          if (kind === "pdf") input.current?.click();
+                          else setAddingSource(kind);
+                        }}
+                      >
+                        <Icon size={16} aria-hidden="true" />
+                        {label}
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
             <input
               ref={input}
               className="hidden"
@@ -673,11 +724,8 @@ export function Workspace({
       )}
       {addingSource && (
         <AddSourceDialog
-          onClose={() => setAddingSource(false)}
-          onPdf={() => {
-            setAddingSource(false);
-            input.current?.click();
-          }}
+          onClose={() => setAddingSource(null)}
+          kind={addingSource}
           onAdd={(source) =>
             void addSources([
               {
