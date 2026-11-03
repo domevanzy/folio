@@ -40,11 +40,11 @@ export async function answer(
   let releaseSlot: (() => Promise<void>) | undefined;
   try {
     const { db, user } = await notebookContext(notebookId, request);
+    releaseSlot = await acquireRequestSlot(db, "model");
+    await rateLimit(db, summary ? "summary" : "chat");
     const body = schema.parse(await readJson(request));
     if (!summary && !body.question)
       throw new HttpError(400, "Bitte eine Frage eingeben.");
-    releaseSlot = await acquireRequestSlot(db, "model");
-    await rateLimit(db, summary ? "summary" : "chat");
     const question = summary
       ? "Erstelle eine strukturierte Zusammenfassung der vorliegenden Auszüge. Nenne zentrale Themen, Kernaussagen und offene Fragen. Kennzeichne die Zusammenfassung ausdrücklich als auszugbasiert und möglicherweise unvollständig."
       : body.question!;

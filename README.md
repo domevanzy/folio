@@ -18,7 +18,7 @@ npm run dev
 ### 1. Supabase
 
 1. Ein neues Supabase-Projekt anlegen.
-2. `supabase/migrations/001_folio.sql` vollständig im SQL Editor ausführen (alternativ per Supabase CLI `supabase db push` nach Verknüpfung). Das SQL ist eine einmalige initiale Migration für ein leeres Projekt. Die Erweiterung `vector` muss im Schema `extensions` liegen; ein bereits anders eingerichtetes Projekt vorher prüfen.
+2. Alle ausstehenden Dateien in `supabase/migrations/` in numerischer Reihenfolge anwenden, vorzugsweise nach Verknüpfung per `supabase db push`. Migration `001` ist nur für ein leeres Projekt bestimmt. Die Erweiterung `vector` muss im Schema `extensions` liegen. Migration `003` vor der Inbetriebnahme der App anwenden, damit die Prüfung paralleler Verarbeitungen verfügbar ist.
 3. Project URL und **Publishable Key** aus den Projekteinstellungen übernehmen. Ein älterer `anon`-Key ist ebenfalls verwendbar. **Keinen Service-Role-Key eintragen.** Die Anwendung benötigt ihn nicht.
 4. In Authentication den Email-Provider und Benutzerregistrierung aktivieren. Die Anwendung nutzt **E-Mail und Passwort**. Die E-Mail-Bestätigung für neue Konten bleibt aktiv. Die Site URL lokal auf `http://localhost:3000` setzen; für Produktion später die tatsächliche HTTPS-Origin verwenden.
 5. Unter Authentication → URL Configuration die vollständigen Rückleitungen erlauben:
