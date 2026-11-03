@@ -185,6 +185,7 @@ jobs:
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_TEAM_ID }}
           DEPLOYMENT_ID: ${{ steps.production-build.outputs.id }}
+          PRODUCTION_DOMAIN: folio-vanzydev.vercel.app
         run: |
           current=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')
           if [[ "$current" != "$GITHUB_SHA" ]]; then
