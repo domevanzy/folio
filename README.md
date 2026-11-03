@@ -207,11 +207,11 @@ die folgenden Repository-Einstellungen hinterlegen:
 | Typ | Name | Wert |
 | --- | --- | --- |
 | Secret | `VERCEL_TOKEN` | Token mit Zugriff auf das Folio-Projekt |
-| Variable | `VERCEL_PROJECT_ID` | Vercel-Projekt-ID |
-| Variable | `VERCEL_TEAM_ID` | ID des Vercel-Teams |
-| Variable | `STAGING_SUPABASE_PROJECT_REF` | Ref des Staging-Projekts |
+| Secret | `VERCEL_PROJECT_ID` | Vercel-Projekt-ID |
+| Secret | `VERCEL_TEAM_ID` | ID des Vercel-Teams |
+| Secret | `STAGING_SUPABASE_PROJECT_REF` | Ref des Staging-Projekts |
 | Secret | `STAGING_DB_MIGRATION_URL` | Staging Session-Pooler-URL mit Benutzer `postgres.<staging-project-ref>` und Datenbankpasswort |
-| Variable | `STAGING_SCHEMA_DATABASE_CA` | Vollständiger PEM-Inhalt des Staging-CA-Zertifikats |
+| Secret | `STAGING_SCHEMA_DATABASE_CA` | Vollständiger PEM-Inhalt des Staging-CA-Zertifikats |
 | Secret | `STAGING_SUPABASE_ACCESS_TOKEN` | Erst bei Edge Functions erforderlich |
 
 Vor dem ersten Lauf die Migrationshistorie abgleichen. Wenn `001_folio.sql`

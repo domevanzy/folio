@@ -35,11 +35,11 @@ jobs:
       - name: Validate staging configuration
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
-          VERCEL_TEAM_ID: ${{ vars.VERCEL_TEAM_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
           STAGING_DB_MIGRATION_URL: ${{ secrets.STAGING_DB_MIGRATION_URL }}
-          STAGING_SCHEMA_DATABASE_CA: ${{ vars.STAGING_SCHEMA_DATABASE_CA }}
-          STAGING_SUPABASE_PROJECT_REF: ${{ vars.STAGING_SUPABASE_PROJECT_REF }}
+          STAGING_SCHEMA_DATABASE_CA: ${{ secrets.STAGING_SCHEMA_DATABASE_CA }}
+          STAGING_SUPABASE_PROJECT_REF: ${{ secrets.STAGING_SUPABASE_PROJECT_REF }}
         run: |
           for key in VERCEL_TOKEN VERCEL_PROJECT_ID VERCEL_TEAM_ID STAGING_DB_MIGRATION_URL STAGING_SCHEMA_DATABASE_CA STAGING_SUPABASE_PROJECT_REF; do
             if [[ -z "${!key}" ]]; then
@@ -62,8 +62,8 @@ jobs:
       - name: Deploy exact commit to Vercel and wait for Ready
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
-          VERCEL_TEAM_ID: ${{ vars.VERCEL_TEAM_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
           GITHUB_REPO_ID: ${{ github.repository_id }}
         run: |
           payload=$(jq -n --arg project "$VERCEL_PROJECT_ID" --arg ref "$GITHUB_REF_NAME" \
@@ -101,7 +101,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           STAGING_DB_MIGRATION_URL: ${{ secrets.STAGING_DB_MIGRATION_URL }}
-          STAGING_SCHEMA_DATABASE_CA: ${{ vars.STAGING_SCHEMA_DATABASE_CA }}
+          STAGING_SCHEMA_DATABASE_CA: ${{ secrets.STAGING_SCHEMA_DATABASE_CA }}
         run: |
           current=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/staging" --jq '.object.sha')
           if [[ "$current" != "$GITHUB_SHA" ]]; then
@@ -124,7 +124,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           SUPABASE_ACCESS_TOKEN: ${{ secrets.STAGING_SUPABASE_ACCESS_TOKEN }}
-          PROJECT_REF: ${{ vars.STAGING_SUPABASE_PROJECT_REF }}
+          PROJECT_REF: ${{ secrets.STAGING_SUPABASE_PROJECT_REF }}
         run: |
           if [[ ! -d supabase/functions ]]; then exit 0; fi
           last_release=$(gh api \
@@ -142,6 +142,6 @@ jobs:
       - name: Check migrated schema and RPC permissions
         env:
           STAGING_DB_MIGRATION_URL: ${{ secrets.STAGING_DB_MIGRATION_URL }}
-          STAGING_SCHEMA_DATABASE_CA: ${{ vars.STAGING_SCHEMA_DATABASE_CA }}
-          STAGING_SUPABASE_PROJECT_REF: ${{ vars.STAGING_SUPABASE_PROJECT_REF }}
+          STAGING_SCHEMA_DATABASE_CA: ${{ secrets.STAGING_SCHEMA_DATABASE_CA }}
+          STAGING_SUPABASE_PROJECT_REF: ${{ secrets.STAGING_SUPABASE_PROJECT_REF }}
         run: node scripts/check-staging-schema.mjs
