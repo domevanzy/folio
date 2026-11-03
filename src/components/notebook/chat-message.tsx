@@ -6,10 +6,12 @@ import { Markdown } from "../markdown";
 export const ChatMessage = memo(function ChatMessage({
   message: m,
   onCitation,
+  draft,
   status = "retrieving",
 }: {
   message: Message;
   onCitation: (citation: Citation) => void;
+  draft?: string;
   status?: ChatStatus;
 }) {
   const citations = m.role === "assistant" ? (m.citations ?? []) : [];
@@ -29,9 +31,21 @@ export const ChatMessage = memo(function ChatMessage({
           onCitation={onCitation}
         />
       ) : (
-        <span role="status" className="flex items-center gap-2 text-xs muted">
-          <Loader2 className="spinner" size={14} /> {chatStatusLabels[status]}
-        </span>
+        !draft && (
+          <span role="status" className="flex items-center gap-2 text-xs muted">
+            <Loader2 className="spinner" size={14} /> {chatStatusLabels[status]}
+          </span>
+        )
+      )}
+      {draft && (
+        <div className="mt-2">
+          <p className="mb-1 text-xs text-neutral-600">
+            Entwurf · Quellenprüfung ausstehend
+          </p>
+          <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">
+            {draft}
+          </p>
+        </div>
       )}
       {citations.length > 0 && (
         <div className="mt-3">
