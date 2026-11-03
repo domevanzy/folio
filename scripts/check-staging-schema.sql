@@ -35,7 +35,10 @@ select expected.signature,
          and has_function_privilege('authenticated', p.oid, 'EXECUTE')
          and not has_function_privilege('anon', p.oid, 'EXECUTE'), false)
 from expected_functions expected
-left join pg_proc p on p.oid = to_regprocedure(expected.signature)
+left join pg_proc p on p.oid = case
+  when expected.security_definer or to_regtype('extensions.vector') is not null
+  then to_regprocedure(expected.signature)
+end
 union all
 select 'storage bucket documents',
        exists (

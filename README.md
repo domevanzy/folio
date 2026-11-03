@@ -205,7 +205,7 @@ keine Migrationen oder RPCs aus.
 
    ```sql
    create role folio_schema_check login password '<eigenes starkes Passwort>';
-   grant usage on schema storage to folio_schema_check;
+   grant usage on schema extensions, storage to folio_schema_check;
    grant select (id, public, file_size_limit, allowed_mime_types)
      on storage.buckets to folio_schema_check;
    ```
