@@ -1,15 +1,7 @@
 import { readFile } from "node:fs/promises";
 import pg from "pg";
 
-const { VERCEL, VERCEL_ENV, VERCEL_GIT_COMMIT_REF } = process.env;
-
 async function checkStagingSchema() {
-  if (VERCEL !== "1" || VERCEL_ENV === "production") return;
-  if (!VERCEL_ENV || (VERCEL_ENV === "preview" && !VERCEL_GIT_COMMIT_REF)) {
-    throw new Error("Vercel-Systemvariablen für Umgebung und Git-Branch aktivieren.");
-  }
-  if (VERCEL_ENV !== "preview" || VERCEL_GIT_COMMIT_REF !== "staging") return;
-
   const connection = process.env.STAGING_SCHEMA_DATABASE_URL;
   if (!connection) {
     throw new Error("STAGING_SCHEMA_DATABASE_URL als Secret für Preview → staging setzen.");
