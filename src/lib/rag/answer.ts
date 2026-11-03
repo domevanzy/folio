@@ -206,6 +206,9 @@ export async function answer(
             })),
             citations,
             signal,
+            onDraft: summary
+              ? undefined
+              : (text) => send({ type: "draft", text }),
             onText: (text) => send({ type: "text", text }),
             onStatus: (stage) => send({ type: "status", stage }),
           });
