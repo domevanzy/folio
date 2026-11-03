@@ -8,6 +8,7 @@ import {
   ArrowUp,
   Check,
   ChevronRight,
+  Clock,
   FileText,
   Layers2,
   Loader2,
@@ -75,8 +76,13 @@ export function Workspace({
     },
     [],
   );
-  const [uploadingFile, setUploadingFile] = useState<string | null>(null);
-  const uploading = uploadingFile !== null;
+  const [pendingSources, setPendingSources] = useState<
+    { id: number; name: string }[]
+  >([]);
+  const sourceUploadInProgress = useRef(false);
+  const [sourceErrors, setSourceErrors] = useState<string[]>([]);
+  const uploading = pendingSources.length > 0;
+  const sourceCount = sources.length + pendingSources.length;
   const [error, setError] = useState("");
   const [drag, setDrag] = useState(false);
   const [tab, setTab] = useState("chat");
@@ -99,40 +105,53 @@ export function Workspace({
     bottom.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
   useEffect(() => {
-    if (!sources.some((s) => s.status === "processing")) return;
+    if (uploading || !sources.some((s) => s.status === "processing")) return;
     const timer = setInterval(() => router.refresh(), 8000);
     return () => clearInterval(timer);
-  }, [sources, router]);
-  async function upload(file?: File) {
-    if (!file || uploading) return;
-    setError("");
-    if (!isValidPdfFile(file)) {
-      setError(PDF_UPLOAD_ERROR);
-      return;
-    }
-    const form = new FormData();
-    form.set("file", file);
-    await addSource(file.name, form);
+  }, [sources, router, uploading]);
+  function upload(files: FileList) {
+    void addSources(
+      Array.from(files, (file) => ({ name: file.name, body: file })),
+    );
   }
-  async function addSource(name: string, body: FormData | object) {
-    if (uploading || busy) return;
-    setError("");
+
+  async function addSources(entries: { name: string; body: object }[]) {
+    if (!entries.length || sourceUploadInProgress.current || busy) return;
+    sourceUploadInProgress.current = true;
     setAddingSource(false);
-    setUploadingFile(name);
+    setSourceErrors([]);
+    setPendingSources(entries.map(({ name }, id) => ({ id, name })));
     try {
-      const data = await api<Source>(
-        notebookUrl(notebook.id, "/sources"),
-        "POST",
-        body,
-      );
-      setSources((prev) => [...prev, data]);
-      setSelected((prev) => new Set([...prev, data.id]));
-      router.refresh();
-    } catch (e) {
-      setError((e as Error).message);
+      for (const { name, body } of entries) {
+        try {
+          let payload = body;
+          if (body instanceof File) {
+            if (!isValidPdfFile(body)) throw new Error(PDF_UPLOAD_ERROR);
+            const form = new FormData();
+            form.set("file", body);
+            payload = form;
+          }
+          const data = await api<Source>(
+            notebookUrl(notebook.id, "/sources"),
+            "POST",
+            payload,
+          );
+          setSources((prev) =>
+            prev.some((source) => source.id === data.id)
+              ? prev
+              : [...prev, data],
+          );
+          setSelected((prev) => new Set([...prev, data.id]));
+        } catch (e) {
+          const message = (e as Error).message;
+          setSourceErrors((prev) => [...prev, `${name}: ${message}`]);
+        } finally {
+          setPendingSources((prev) => prev.slice(1));
+        }
+      }
       router.refresh();
     } finally {
-      setUploadingFile(null);
+      sourceUploadInProgress.current = false;
       if (input.current) input.current.value = "";
     }
   }
@@ -263,7 +282,7 @@ export function Workspace({
               {notebook.title}
             </h1>
             <p className="muted mt-1 text-[10px]">
-              {sources.length} Quellen · Privates Notebook
+              {sourceCount} Quellen · Privates Notebook
             </p>
           </div>
         </div>
@@ -313,12 +332,12 @@ export function Workspace({
           onDrop={(e) => {
             e.preventDefault();
             setDrag(false);
-            upload(e.dataTransfer.files[0]);
+            upload(e.dataTransfer.files);
           }}
         >
           <PanelHeader icon={PanelLeft} title="Quellen">
             <span className="muted rounded-md bg-[#f2f4f6] px-2 py-0.5 text-[10px]">
-              {sources.length}
+              {sourceCount}
             </span>
           </PanelHeader>
           <div className="p-4">
@@ -334,9 +353,12 @@ export function Workspace({
               ref={input}
               className="hidden"
               type="file"
+              multiple
               accept="application/pdf,.pdf"
               aria-label="PDF hochladen"
-              onChange={(e) => upload(e.target.files?.[0])}
+              onChange={(e) => {
+                if (e.target.files) upload(e.target.files);
+              }}
             />
           </div>
           {ready.length > 0 && (
@@ -360,23 +382,6 @@ export function Workspace({
           <div
             className={`min-h-0 flex-1 overflow-auto px-3 ${drag ? "bg-[#e6ebf3]" : ""}`}
           >
-            {uploadingFile !== null && (
-              <div role="status" className="mb-2 rounded-xl p-3">
-                <div className="flex items-center gap-2.5">
-                  <Loader2
-                    aria-hidden="true"
-                    size={17}
-                    className="shrink-0 text-blue-700 motion-safe:animate-spin"
-                  />
-                  <span className="min-w-0 wrap-anywhere text-xs font-medium">
-                    {uploadingFile}
-                  </span>
-                </div>
-                <p className="muted ml-7 mt-2 text-[10px]">
-                  Quelle wird verarbeitet …
-                </p>
-              </div>
-            )}
             {sources.length ? (
               sources.map((s) => (
                 <div
@@ -455,7 +460,7 @@ export function Workspace({
                   )}
                 </div>
               ))
-            ) : uploadingFile === null ? (
+            ) : !uploading && !sourceErrors.length ? (
               <div className="flex h-full min-h-56 flex-col items-center justify-center px-5 pb-10 text-center">
                 <span className="mb-5 flex size-16 items-center justify-center rounded-2xl border border-dashed border-[#c0c9d7] bg-[#f2f4f8]">
                   <UploadCloud size={25} className="text-[#7488a6]" />
@@ -472,6 +477,51 @@ export function Workspace({
                 </p>
               </div>
             ) : null}
+            {pendingSources.map(({ id, name }, index) => {
+              const active = index === 0;
+              const Icon = active ? Loader2 : Clock;
+              return (
+                <div key={id} role="status" className="mb-2 rounded-xl p-3">
+                  <div className="flex items-center gap-2.5">
+                    <Icon
+                      aria-hidden="true"
+                      size={17}
+                      className={
+                        active
+                          ? "shrink-0 text-blue-700 motion-safe:animate-spin"
+                          : "muted shrink-0 motion-safe:animate-pulse"
+                      }
+                    />
+                    <span className="min-w-0 wrap-anywhere text-xs font-medium">
+                      {name}
+                    </span>
+                  </div>
+                  <p className="muted ml-7 mt-2 text-[10px]">
+                    {active
+                      ? "Quelle wird verarbeitet …"
+                      : "Wartet auf Verarbeitung"}
+                  </p>
+                </div>
+              );
+            })}
+            {sourceErrors.length > 0 && (
+              <div
+                role="alert"
+                className="mb-3 flex items-start gap-2 rounded-xl bg-red-50 p-3 text-xs text-red-800"
+              >
+                <ul className="min-w-0 flex-1 space-y-1 wrap-anywhere">
+                  {sourceErrors.map((message, index) => (
+                    <li key={index}>{message}</li>
+                  ))}
+                </ul>
+                <button
+                  aria-label="Fehlermeldungen schließen"
+                  onClick={() => setSourceErrors([])}
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
           </div>
           <div className="border-t border-[#eaecf0] p-4 text-[10px] leading-5 muted">
             Nur ausgewählte Quellen werden für deine Antworten verwendet.
@@ -629,10 +679,12 @@ export function Workspace({
             input.current?.click();
           }}
           onAdd={(source) =>
-            void addSource(
-              source.kind === "text" ? source.name : source.url,
-              source,
-            )
+            void addSources([
+              {
+                name: source.kind === "text" ? source.name : source.url,
+                body: source,
+              },
+            ])
           }
         />
       )}
