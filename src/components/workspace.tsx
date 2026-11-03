@@ -177,7 +177,7 @@ export function Workspace({
         );
         if (seq !== viewerSeq.current) return;
         if (preview.kind === "pdf")
-          setViewer({ sourceId, name, page, url: preview.url });
+          setViewer({ name, page, url: preview.url });
         else setWrittenViewer({ name, excerpt, ...preview });
       } catch (e) {
         setError((e as Error).message);
@@ -786,9 +786,6 @@ export function Workspace({
         <PdfViewer
           key={viewer.url}
           document={viewer}
-          pageCount={
-            sources.find((s) => s.id === viewer.sourceId)?.page_count || 100
-          }
           onClose={() => {
             viewerSeq.current++;
             setViewer(null);
