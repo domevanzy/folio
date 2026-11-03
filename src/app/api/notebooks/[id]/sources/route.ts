@@ -10,6 +10,7 @@ import {
   failure,
   HttpError,
   rateLimit,
+  acquireRequestSlot,
   checked,
 } from "@/lib/http";
 import { config } from "@/lib/config";
@@ -23,9 +24,11 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  let releaseSlot: (() => Promise<void>) | undefined;
   try {
     const { id } = await params;
     const { db, user } = await notebookContext(id, request);
+    releaseSlot = await acquireRequestSlot(db, "upload");
     await rateLimit(db, "upload");
     google();
     const contentType = request.headers.get("content-type") || "";
@@ -125,5 +128,7 @@ export async function POST(
     }
   } catch (error) {
     return failure(error);
+  } finally {
+    await releaseSlot?.();
   }
 }

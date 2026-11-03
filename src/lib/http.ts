@@ -5,6 +5,7 @@ export class HttpError extends Error {
   constructor(
     public status: number,
     message: string,
+    public retryAfter?: number,
   ) {
     super(message);
   }
@@ -47,13 +48,57 @@ export async function rateLimit(
     throw new HttpError(
       429,
       "Zu viele Anfragen. Bitte später erneut versuchen.",
+      Math.ceil((3_600_000 - (Date.now() % 3_600_000)) / 1000),
     );
 }
+export async function acquireRequestSlot(
+  db: Awaited<ReturnType<typeof supabase>>,
+  kind: "model" | "upload",
+) {
+  const { data: token, error } = await db.rpc("acquire_request_slot", {
+    p_kind: kind,
+  });
+  if (error) throw new HttpError(503, "Limit-Prüfung fehlgeschlagen.");
+  if (!token)
+    throw new HttpError(
+      429,
+      "Eine Verarbeitung läuft bereits. Bitte versuche es gleich erneut.",
+      5,
+    );
+
+  return async () => {
+    try {
+      const { error } = await db
+        .rpc("release_request_slot", {
+          p_kind: kind,
+          p_token: token,
+        })
+        .abortSignal(AbortSignal.timeout(3000));
+      if (error)
+        console.error("Verarbeitungsplatz konnte nicht freigegeben werden.");
+    } catch {
+      console.error("Verarbeitungsplatz konnte nicht freigegeben werden.");
+    }
+  };
+}
+
 export function failure(error: unknown) {
   if (error instanceof SyntaxError)
     return Response.json({ error: "Ungültige JSON-Eingabe." }, { status: 400 });
   if (error instanceof HttpError)
-    return Response.json({ error: error.message }, { status: error.status });
+    return Response.json(
+      { error: error.message },
+      {
+        status: error.status,
+        headers:
+          error.retryAfter === undefined
+            ? undefined
+            : {
+                "Retry-After": String(error.retryAfter),
+                "Cache-Control": "no-store",
+              },
+      },
+    );
   if (error instanceof z.ZodError)
     return Response.json({ error: "Ungültige Eingabe." }, { status: 400 });
   console.error(
@@ -68,6 +113,16 @@ export function failure(error: unknown) {
   );
 }
 export function checked<T extends { error: unknown }>(result: T): T {
+  if (
+    result.error &&
+    typeof result.error === "object" &&
+    "code" in result.error &&
+    result.error.code === "PT429"
+  )
+    throw new HttpError(
+      409,
+      "Speicherkontingent erreicht. Bitte lösche ältere Inhalte.",
+    );
   if (result.error) throw new Error("Datenbankoperation fehlgeschlagen.");
   return result;
 }
