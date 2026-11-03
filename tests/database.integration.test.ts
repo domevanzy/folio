@@ -37,12 +37,14 @@ beforeAll(async () => {
  grant usage on schema public,auth,storage,extensions to authenticated,anon;
  grant select,insert,delete on storage.objects to authenticated;
  `);
-  await db.exec(
-    await readFile(
-      new URL("../supabase/migrations/001_folio.sql", import.meta.url),
-      "utf8",
-    ),
-  );
+  for (const migration of ["001_folio.sql", "002_source_types.sql"]) {
+    await db.exec(
+      await readFile(
+        new URL(`../supabase/migrations/${migration}`, import.meta.url),
+        "utf8",
+      ),
+    );
+  }
   await db.query("insert into auth.users values($1),($2)", [owner, other]);
   for (let i = 0; i < 3; i++)
     await db.query(
