@@ -1,42 +1,34 @@
 import { readFile } from "node:fs/promises";
 import pg from "pg";
 
-const { VERCEL, VERCEL_ENV, VERCEL_GIT_COMMIT_REF } = process.env;
-
 async function checkStagingSchema() {
-  if (VERCEL !== "1" || VERCEL_ENV === "production") return;
-  if (!VERCEL_ENV || (VERCEL_ENV === "preview" && !VERCEL_GIT_COMMIT_REF)) {
-    throw new Error("Vercel-Systemvariablen für Umgebung und Git-Branch aktivieren.");
-  }
-  if (VERCEL_ENV !== "preview" || VERCEL_GIT_COMMIT_REF !== "staging") return;
-
-  const connection = process.env.STAGING_SCHEMA_DATABASE_URL;
+  const connection = process.env.STAGING_DB_MIGRATION_URL;
   if (!connection) {
-    throw new Error("STAGING_SCHEMA_DATABASE_URL als Secret für Preview → staging setzen.");
+    throw new Error("STAGING_DB_MIGRATION_URL als GitHub Actions Secret setzen.");
   }
 
   let database;
   let project;
   try {
     database = new URL(connection);
-    project = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname.split(".")[0];
+    project = process.env.STAGING_SUPABASE_PROJECT_REF;
   } catch {
     throw new Error("Staging-Datenbank-URL und Supabase-Projekt-URL prüfen.");
   }
 
   if (!["postgresql:", "postgres:"].includes(database.protocol)) {
-    throw new Error("STAGING_SCHEMA_DATABASE_URL braucht postgresql:// oder postgres://.");
+    throw new Error("STAGING_DB_MIGRATION_URL braucht postgresql:// oder postgres://.");
   }
   if (!database.hostname.endsWith(".pooler.supabase.com") ||
       (database.port && database.port !== "5432")) {
-    throw new Error("STAGING_SCHEMA_DATABASE_URL braucht den Supabase Session-Pooler auf Port 5432.");
+    throw new Error("STAGING_DB_MIGRATION_URL braucht den Supabase Session-Pooler auf Port 5432.");
   }
   const username = decodeURIComponent(database.username);
-  if (!username.startsWith("folio_schema_check.")) {
-    throw new Error("Der Pooler-Benutzer muss folio_schema_check.<projekt-ref> sein.");
+  if (!username.startsWith("postgres.")) {
+    throw new Error("Der Pooler-Benutzer muss postgres.<projekt-ref> sein.");
   }
-  if (username !== `folio_schema_check.${project}`) {
-    throw new Error("Die Projekt-Ref im Pooler-Benutzernamen stimmt nicht mit NEXT_PUBLIC_SUPABASE_URL überein.");
+  if (username !== `postgres.${project}`) {
+    throw new Error("Die Projekt-Ref im Pooler-Benutzernamen stimmt nicht mit STAGING_SUPABASE_PROJECT_REF überein.");
   }
 
   const sql = await readFile(new URL("./check-staging-schema.sql", import.meta.url), "utf8");

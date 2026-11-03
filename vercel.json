@@ -1,6 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "buildCommand": "node scripts/check-staging-schema.mjs && npm run build",
-  "installCommand": "npm ci"
+  "buildCommand": "npm run build",
+  "installCommand": "npm ci",
+  "git": {
+    "deploymentEnabled": { "staging": false }
+  }
 }

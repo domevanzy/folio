@@ -195,43 +195,35 @@ Kein Deployment wurde allein durch die lokale Implementierung veröffentlicht. E
 
 ### Datenbankprüfung beim Staging-Deploy
 
-Der Vercel-Build für `Preview → staging` prüft zentrale Schemaobjekte aus
-`001_folio.sql`, RLS, den PDF-Bucket und die Signaturen und Ausführungsrechte
-beider RPCs. Die Prüfung liest den tatsächlichen Datenbankstand. Sie führt
-keine Migrationen oder RPCs aus.
+GitHub Actions erstellt den Vercel-Preview-Build für den Staging-Commit.
+Erst nach `Ready` folgen Migrationen, bei geänderten Funktionsdateien oder
+geänderter Supabase-Konfiguration Edge Functions und die lesende Schemaprüfung.
+Die Preview kann erreichbar sein, bevor die Datenbankschritte abgeschlossen
+sind. Maßgeblich ist der erfolgreiche GitHub-Workflow **Staging release**.
 
-1. Im **Staging**-Supabase-Projekt im SQL Editor eine eigene Login-Rolle
-   mit einem starken, eindeutigen Passwort anlegen:
+Vor Aktivierung unter **GitHub → Settings → Secrets and variables → Actions**
+die folgenden Repository-Einstellungen hinterlegen:
 
-   ```sql
-   create role folio_schema_check login password '<eigenes starkes Passwort>';
-   grant usage on schema extensions, storage to folio_schema_check;
-   grant select (id, public, file_size_limit, allowed_mime_types)
-     on storage.buckets to folio_schema_check;
-   ```
+| Typ | Name | Wert |
+| --- | --- | --- |
+| Secret | `VERCEL_TOKEN` | Token mit Zugriff auf das Folio-Projekt |
+| Secret | `VERCEL_PROJECT_ID` | Vercel-Projekt-ID |
+| Secret | `VERCEL_TEAM_ID` | ID des Vercel-Teams |
+| Secret | `STAGING_SUPABASE_PROJECT_REF` | Ref des Staging-Projekts |
+| Secret | `STAGING_DB_MIGRATION_URL` | Staging Session-Pooler-URL mit Benutzer `postgres.<staging-project-ref>` und Datenbankpasswort |
+| Secret | `STAGING_SCHEMA_DATABASE_CA` | Vollständiger PEM-Inhalt des Staging-CA-Zertifikats |
+| Secret | `STAGING_SUPABASE_ACCESS_TOKEN` | Erst bei Edge Functions erforderlich |
 
-   Die Rolle benötigt Sicht auf den Bucket `documents`. Falls für
-   `storage.buckets` Row Level Security aktiv ist, erlaube dieser Rolle
-   ausschließlich die Sicht auf diesen Bucket:
+Vor dem ersten Lauf die Migrationshistorie abgleichen. Wenn `001_folio.sql`
+bereits manuell eingespielt wurde, nach Prüfung des tatsächlichen Schemas die
+Migration als angewendet eintragen. Bei leerem Schema spielt der Workflow sie
+ein. Bei einem Abbruch kann der Workflow für den aktuellen Branch erneut
+gestartet werden. Production wird separat umgestellt.
 
-   ```sql
-   create policy folio_schema_check_documents on storage.buckets
-     for select to folio_schema_check using (id = 'documents');
-   ```
+Den Session-Pooler-Host findest du im Staging-Projekt unter **Connect**.
+Sonderzeichen im Datenbankpasswort müssen URL-kodiert sein. Das CA-Zertifikat
+gibt es unter **Database Settings → SSL Configuration**. Hinterlege den
+vollständigen PEM-Text in GitHub. Die Schemaprüfung verwendet denselben
+Zugang wie `supabase db push` in einer Read-only-Transaktion.
 
-2. In Supabase unter **Connect** den Host des **Session pooler** kopieren.
-   In Vercel das Secret `STAGING_SCHEMA_DATABASE_URL` für **Preview → staging**
-   setzen. URL-encode Sonderzeichen im Passwort:
-
-   ```text
-   postgresql://folio_schema_check.<staging-project-ref>:<url-encoded-password>@<session-pooler-host>:5432/postgres
-   ```
-
-3. In Supabase unter **Database Settings → SSL Configuration** das
-   CA-Zertifikat des Staging-Projekts herunterladen. Den vollständigen
-   PEM-Inhalt inklusive `BEGIN CERTIFICATE` und `END CERTIFICATE` in Vercel
-   als Config `STAGING_SCHEMA_DATABASE_CA` für **Preview → staging** speichern.
-   Die Verbindung prüft das Zertifikat und den Hostnamen.
-
-4. Die Vercel-Systemvariablen aktiviert lassen und den Branch `staging`
-   neu deployen. Das Build-Log zeigt das Ergebnis der Prüfung.
+Unter **GitHub → Actions → Staging release** steht das Ergebnis.
