@@ -192,3 +192,40 @@ Kein Deployment wurde allein durch die lokale Implementierung veröffentlicht. E
 - [Supabase: Cookie-basierte Server-Clients](https://supabase.com/docs/guides/auth/server-side/creating-a-client?queryGroups=framework&framework=nextjs)
 - [Vercel AI SDK: Google-Provider und Embeddings](https://ai-sdk.dev/providers/ai-sdk-providers/google)
 - [Gemini Embeddings](https://ai.google.dev/gemini-api/docs/embeddings)
+
+### Datenbankprüfung beim Staging-Deploy
+
+Der Vercel-Build für `Preview → staging` prüft zentrale Schemaobjekte aus
+`001_folio.sql`, RLS, den PDF-Bucket und die Signaturen und Ausführungsrechte
+beider RPCs. Die Prüfung liest den tatsächlichen Datenbankstand. Sie führt
+keine Migrationen oder RPCs aus.
+
+1. Im **Staging**-Supabase-Projekt im SQL Editor eine eigene Login-Rolle
+   mit einem starken, eindeutigen Passwort anlegen:
+
+   ```sql
+   create role folio_schema_check login password '<eigenes starkes Passwort>';
+   grant usage on schema storage to folio_schema_check;
+   grant select (id, public, file_size_limit, allowed_mime_types)
+     on storage.buckets to folio_schema_check;
+   ```
+
+   Die Rolle benötigt Sicht auf den Bucket `documents`. Falls für
+   `storage.buckets` Row Level Security aktiv ist, erlaube dieser Rolle
+   ausschließlich die Sicht auf diesen Bucket:
+
+   ```sql
+   create policy folio_schema_check_documents on storage.buckets
+     for select to folio_schema_check using (id = 'documents');
+   ```
+
+2. In Supabase unter **Connect** den Host des **Session pooler** kopieren.
+   In Vercel das Secret `STAGING_SCHEMA_DATABASE_URL` für **Preview → staging**
+   setzen. URL-encode Sonderzeichen im Passwort:
+
+   ```text
+   postgresql://folio_schema_check.<staging-project-ref>:<url-encoded-password>@<session-pooler-host>:5432/postgres
+   ```
+
+3. Die Vercel-Systemvariablen aktiviert lassen und den Branch `staging`
+   neu deployen. Das Build-Log zeigt das Ergebnis der Prüfung.
