@@ -20,8 +20,8 @@ jobs:
         run: |
           issue=$(jq -r '
             .pull_request |
-            (.title | capture("^(feat|fix|chore|docs)\\\\(#(?<issue>[1-9][0-9]*)\\\\): .{8,120}$") | .issue) as $issue |
-            select((.body // "") | test("\\\\bCloses\\\\s+#" + $issue + "\\\\b"; "i")) |
+            (.title | capture("^(feat|fix|chore|docs)\\(#(?<issue>[1-9][0-9]*)\\): .{8,120}$") | .issue) as $issue |
+            select((.body // "") | test("\\bCloses\\s+#" + $issue + "\\b"; "i")) |
             $issue
           ' "$GITHUB_EVENT_PATH")
           if [[ -z "$issue" ]]; then
