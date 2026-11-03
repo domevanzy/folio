@@ -119,8 +119,12 @@ jobs:
           deployment=$(curl --fail --silent --show-error --max-time 30 \
             -H "Authorization: Bearer $VERCEL_TOKEN" \
             "https://api.vercel.com/v13/deployments/${url#https://}?teamId=$VERCEL_ORG_ID")
-          jq -e '.readyState == "READY" and .target == "production" and .aliasAssigned == false' \
-            <<< "$deployment" >/dev/null
+          if ! jq -e --arg project "$VERCEL_PROJECT_ID" \
+            '.readyState == "READY" and .target == "production" and .projectId == $project' \
+            <<< "$deployment" >/dev/null; then
+            jq -r '"::error::Unexpected deployment state: \(.readyState), target: \(.target)"' <<< "$deployment"
+            exit 1
+          fi
           echo "url=$url" >> "$GITHUB_OUTPUT"
 
       - name: Apply pending migrations
