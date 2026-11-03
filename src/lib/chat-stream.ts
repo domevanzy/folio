@@ -19,6 +19,7 @@ export const chatEventSchema = z.discriminatedUnion("type", [
     type: z.literal("status"),
     stage: z.enum(["retrieving", "generating", "validating", "saving"]),
   }),
+  z.object({ type: z.literal("draft"), text: z.string() }),
   z.object({ type: z.literal("text"), text: z.string() }),
   z.object({
     type: z.literal("done"),

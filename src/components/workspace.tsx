@@ -62,7 +62,8 @@ export function Workspace({
     setPreviousSources(initialSources);
     setSources(initialSources);
   }
-  const [messages, setMessages] = useState(initialMessages);
+  const [messages, setMessages] =
+    useState<(Message & { draft?: string })[]>(initialMessages);
   const [selected, setSelected] = useState(
     () =>
       new Set(
@@ -176,8 +177,7 @@ export function Workspace({
           "GET",
         );
         if (seq !== viewerSeq.current) return;
-        if (preview.kind === "pdf")
-          setViewer({ name, page, url: preview.url });
+        if (preview.kind === "pdf") setViewer({ name, page, url: preview.url });
         else setWrittenViewer({ name, excerpt, ...preview });
       } catch (e) {
         setError((e as Error).message);
@@ -208,13 +208,14 @@ export function Workspace({
       citations: [],
     };
     let responseText = "";
+    let draft = "";
     let done = false;
     setMessages((prev) => [
       ...prev,
       userMessage,
       { id: assistantId, role: "assistant", content: "", citations: [] },
     ]);
-    const update = (data: Partial<Message>) =>
+    const update = (data: Partial<Message> & { draft?: string }) =>
       setMessages((prev) =>
         prev.map((m) => (m.id === assistantId ? { ...m, ...data } : m)),
       );
@@ -235,12 +236,17 @@ export function Workspace({
       for await (const event of readChatEvents(response.body)) {
         if (event.type === "status") setChatStatus(event.stage);
         if (event.type === "error") throw new Error(event.error);
+        if (event.type === "draft") {
+          draft += event.text;
+          update({ draft });
+        }
         if (event.type === "text") {
+          draft = "";
           responseText += event.text;
-          update({ content: responseText });
+          update({ content: responseText, draft });
         }
         if (event.type === "done") {
-          update({ citations: event.citations });
+          update({ citations: event.citations, draft: "" });
           done = true;
         }
       }
@@ -633,6 +639,7 @@ export function Workspace({
                   key={m.id}
                   message={m}
                   onCitation={cite}
+                  draft={m.draft}
                   status={chatStatus}
                 />
               ))

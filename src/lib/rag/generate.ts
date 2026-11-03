@@ -12,6 +12,7 @@ type Options = {
   history: { role: "user" | "assistant"; content: string }[];
   citations: Citation[];
   signal: AbortSignal;
+  onDraft?: (text: string) => void;
   onText: (text: string) => void;
   onStatus: (status: ChatStatus) => void;
 };
@@ -21,6 +22,7 @@ export async function generateGroundedAnswer({
   history,
   citations,
   signal,
+  onDraft,
   onText,
   onStatus,
 }: Options) {
@@ -53,11 +55,15 @@ export async function generateGroundedAnswer({
   });
   let content = "";
   let pending = "";
+  let previewed = 0;
   const flush = (paragraph: string) => {
     if (!paragraph.trim()) return;
     onStatus("validating");
     const safe = groundedParagraph(paragraph, citations);
-    if (safe === missingParagraphEvidence && content.endsWith(safe)) return;
+    if (safe === missingParagraphEvidence && content.endsWith(safe)) {
+      if (previewed) onText("");
+      return;
+    }
     content += safe;
     onText(safe);
   };
@@ -80,6 +86,15 @@ export async function generateGroundedAnswer({
     while ((boundary = pending.indexOf("\n\n")) >= 0) {
       flush(pending.slice(0, boundary + 2));
       pending = pending.slice(boundary + 2);
+      previewed = 0;
+    }
+    if (onDraft) {
+      // Keep the unfinished word for the next provider chunk.
+      const complete = pending.slice(previewed).match(/^[\s\S]*\s/)?.[0];
+      if (complete && (previewed || complete.trim())) {
+        previewed += complete.length;
+        onDraft(complete);
+      }
     }
   }
   signal.throwIfAborted();
