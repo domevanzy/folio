@@ -1,6 +1,6 @@
 "use client";
 import { config } from "@/lib/config";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -115,27 +115,30 @@ export function Workspace({
       if (input.current) input.current.value = "";
     }
   }
-  async function showSource(
-    sourceId: string,
-    name: string,
-    page = 1,
-    excerpt?: string,
-  ) {
-    const seq = ++viewerSeq.current;
-    setViewLoading(true);
-    try {
-      const { url } = await api<{ url: string }>(
-        sourceUrl(notebook.id, sourceId),
-        "GET",
-      );
-      if (seq === viewerSeq.current)
-        setViewer({ sourceId, name, page, url, excerpt, excerptPage: page });
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      if (seq === viewerSeq.current) setViewLoading(false);
-    }
-  }
+  const showSource = useCallback(
+    async function showSource(
+      sourceId: string,
+      name: string,
+      page = 1,
+      excerpt?: string,
+    ) {
+      const seq = ++viewerSeq.current;
+      setViewLoading(true);
+      try {
+        const { url } = await api<{ url: string }>(
+          sourceUrl(notebook.id, sourceId),
+          "GET",
+        );
+        if (seq === viewerSeq.current)
+          setViewer({ sourceId, name, page, url, excerpt, excerptPage: page });
+      } catch (e) {
+        setError((e as Error).message);
+      } finally {
+        if (seq === viewerSeq.current) setViewLoading(false);
+      }
+    },
+    [notebook.id],
+  );
   async function ask(text = question, summary = false) {
     if (busy || uploading || !selected.size || (!summary && !text.trim()))
       return;
@@ -213,8 +216,10 @@ export function Workspace({
       router.refresh();
     }
   }
-  const cite = (c: Citation) =>
-    showSource(c.sourceId, c.name, c.page, c.excerpt);
+  const cite = useCallback(
+    (c: Citation) => showSource(c.sourceId, c.name, c.page, c.excerpt),
+    [showSource],
+  );
   return (
     <>
       <header className="flex h-[89px] items-center justify-between gap-4 px-5 md:px-7">
@@ -266,6 +271,7 @@ export function Workspace({
           <Button
             key={key}
             size="sm"
+            aria-pressed={tab === key}
             variant={tab === key ? "default" : "ghost"}
             onClick={() => setTab(key)}
           >
@@ -353,8 +359,11 @@ export function Workspace({
                     />
                     <button
                       disabled={s.status !== "ready"}
-                      onClick={() => showSource(s.id, s.name)}
-                      className="min-w-0 flex-1 truncate text-left text-xs font-medium"
+                      onClick={(event) => {
+                        event.currentTarget.focus();
+                        void showSource(s.id, s.name);
+                      }}
+                      className="min-w-0 flex-1 wrap-anywhere text-left text-xs font-medium enabled:underline enabled:decoration-[#a7b59f] enabled:underline-offset-2"
                       title={s.name}
                     >
                       {s.name}
@@ -362,7 +371,7 @@ export function Workspace({
                     <input
                       type="checkbox"
                       aria-label={`${s.name} als Quelle auswählen`}
-                      className="shrink-0 accent-[#426043]"
+                      className="size-5 shrink-0 accent-[#426043]"
                       disabled={s.status !== "ready" || busy}
                       checked={selected.has(s.id)}
                       onChange={(e) => {
@@ -525,7 +534,7 @@ export function Workspace({
               />
               <div className="flex items-center justify-between">
                 <span className="px-1 text-[10px] muted">
-                  {selected.size} Quellen ausgewählt
+                  {selected.size} von {ready.length} Quellen ausgewählt
                 </span>
                 <Button
                   type={busy ? "button" : "submit"}
