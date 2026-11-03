@@ -178,3 +178,37 @@ describe("migrated PostgreSQL/pgvector and RLS", () => {
     await expect(search(notebooks[0], [sources[0]])).rejects.toThrow();
   });
 });
+
+it("checks staging schema as the build role and reports a missing RPC", async () => {
+  const sql = await readFile(
+    new URL("../scripts/check-staging-schema.sql", import.meta.url),
+    "utf8",
+  );
+  await db.exec(`
+    reset role;
+    create role folio_schema_check;
+    grant usage on schema extensions, storage to folio_schema_check;
+    grant select (id, public, file_size_limit, allowed_mime_types)
+      on storage.buckets to folio_schema_check;
+  `);
+
+  async function check() {
+    await db.exec("set role folio_schema_check; begin read only");
+    try {
+      return (await db.query<{ name: string; ok: boolean }>(sql)).rows;
+    } finally {
+      await db.exec("rollback; reset role");
+    }
+  }
+
+  expect((await check()).filter(({ ok }) => !ok)).toEqual([]);
+  await db.exec("begin; drop function public.consume_rate_limit(text)");
+  try {
+    const result = await db.query<{ name: string; ok: boolean }>(sql);
+    expect(result.rows.filter(({ ok }) => !ok)).toEqual([
+      { name: "public.consume_rate_limit(text)", ok: false },
+    ]);
+  } finally {
+    await db.exec("rollback");
+  }
+});
