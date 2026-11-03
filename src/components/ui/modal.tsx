@@ -38,7 +38,7 @@ export function Modal({
   return (
     <div
       className={cn(
-        "fixed inset-0 z-50 flex items-center justify-center bg-[#14231b]/30 p-5 backdrop-blur-sm",
+        "fixed inset-0 z-50 flex items-center justify-center bg-[#131a24]/30 p-5 backdrop-blur-sm",
         overlayClassName,
       )}
       onClick={(e) => {

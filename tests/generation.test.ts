@@ -82,6 +82,31 @@ describe("real AI SDK stream handling with test provider", () => {
       "validating",
     ]);
   });
+  it("streams one separated notice for consecutive paragraphs without references", async () => {
+    modelWith([
+      { type: "text-start", id: "answer" },
+      {
+        type: "text-delta",
+        id: "answer",
+        delta: "Ohne Beleg.\n\nAuch ohne Beleg.\n",
+      },
+      {
+        type: "text-delta",
+        id: "answer",
+        delta: "\nDas Budget beträgt 180.000 Euro [C1].",
+      },
+      { type: "text-end", id: "answer" },
+      finish,
+    ]);
+    const request = options();
+    const content = await generateGroundedAnswer(request);
+    expect(content).toBe(
+      "Für diesen Abschnitt liegt keine überprüfbare Quellenbasis vor.\n\nDas Budget beträgt 180.000 Euro [C1].",
+    );
+    expect(request.onText.mock.calls.map(([text]) => text).join("")).toBe(
+      content,
+    );
+  });
   it("propagates a provider 503 rather than silently returning an empty answer", async () => {
     const error = Object.assign(new Error("provider payload"), {
       statusCode: 503,

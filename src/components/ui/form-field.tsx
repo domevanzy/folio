@@ -16,7 +16,7 @@ export function FormField({ label, hint, id, ...props }: Props) {
         id={inputId}
         aria-describedby={hint ? inputId + "-hint" : undefined}
         className={cn(
-          "h-11 w-full rounded-xl border border-[#dce2db] bg-white px-3 disabled:opacity-50",
+          "h-11 w-full rounded-xl border border-[#d9dde4] bg-white px-3 disabled:opacity-50",
           props.className,
         )}
       />

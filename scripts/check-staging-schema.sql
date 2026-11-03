@@ -5,12 +5,15 @@ with expected_tables(name, policy) as (
     ('document_chunks', 'own_chunks'),
     ('conversations', 'own_conversations'),
     ('messages', 'own_messages'),
-    ('request_limits', null)
+    ('request_limits', null),
+    ('request_slots', null)
 ),
 expected_functions(signature, security_definer) as (
   values
     ('public.match_document_chunks(uuid,uuid[],extensions.vector,integer,double precision)', false),
-    ('public.consume_rate_limit(text)', true)
+    ('public.consume_rate_limit(text)', true),
+    ('public.acquire_request_slot(text)', true),
+    ('public.release_request_slot(text,uuid)', true)
 )
 select 'public.' || expected.name as name,
        coalesce(c.relkind = 'r' and c.relrowsecurity and (
