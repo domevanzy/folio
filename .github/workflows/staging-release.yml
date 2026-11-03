@@ -185,6 +185,7 @@ jobs:
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_TEAM_ID }}
           DEPLOYMENT_ID: ${{ steps.production-build.outputs.id }}
+          PRODUCTION_DOMAIN: folio-vanzydev.vercel.app
         run: |
           current=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')
           if [[ "$current" != "$GITHUB_SHA" ]]; then
@@ -195,11 +196,12 @@ jobs:
             -H "Authorization: Bearer $VERCEL_TOKEN" -H 'Content-Type: application/json' \
             -d '{}' "https://api.vercel.com/v10/projects/$VERCEL_PROJECT_ID/promote/$DEPLOYMENT_ID?teamId=$VERCEL_ORG_ID" >/dev/null
           for ((attempt = 0; attempt < 30; attempt++)); do
-            project=$(curl --fail --silent --show-error --max-time 30 \
+            alias_status=$(curl --fail --silent --show-error --max-time 30 \
               -H "Authorization: Bearer $VERCEL_TOKEN" \
-              "https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID?teamId=$VERCEL_ORG_ID")
-            if jq -e --arg id "$DEPLOYMENT_ID"               '.targets.production.id == $id and .lastAliasRequest.jobStatus == "succeeded"'               <<< "$project" >/dev/null; then
-              echo "Production deployment promoted: $DEPLOYMENT_ID"
+              "https://api.vercel.com/v4/aliases/$PRODUCTION_DOMAIN?teamId=$VERCEL_ORG_ID")
+            if jq -e --arg id "$DEPLOYMENT_ID" '.deploymentId == $id' \
+              <<< "$alias_status" >/dev/null; then
+              echo "Production domain $PRODUCTION_DOMAIN points to $DEPLOYMENT_ID"
               exit 0
             fi
             sleep 10
