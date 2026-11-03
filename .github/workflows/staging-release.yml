@@ -38,11 +38,10 @@ jobs:
           VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
           VERCEL_TEAM_ID: ${{ vars.VERCEL_TEAM_ID }}
           STAGING_DB_MIGRATION_URL: ${{ secrets.STAGING_DB_MIGRATION_URL }}
-          STAGING_SCHEMA_DATABASE_URL: ${{ secrets.STAGING_SCHEMA_DATABASE_URL }}
           STAGING_SCHEMA_DATABASE_CA: ${{ vars.STAGING_SCHEMA_DATABASE_CA }}
           STAGING_SUPABASE_PROJECT_REF: ${{ vars.STAGING_SUPABASE_PROJECT_REF }}
         run: |
-          for key in VERCEL_TOKEN VERCEL_PROJECT_ID VERCEL_TEAM_ID STAGING_DB_MIGRATION_URL STAGING_SCHEMA_DATABASE_URL STAGING_SCHEMA_DATABASE_CA STAGING_SUPABASE_PROJECT_REF; do
+          for key in VERCEL_TOKEN VERCEL_PROJECT_ID VERCEL_TEAM_ID STAGING_DB_MIGRATION_URL STAGING_SCHEMA_DATABASE_CA STAGING_SUPABASE_PROJECT_REF; do
             if [[ -z "${!key}" ]]; then
               echo "::error::Missing GitHub configuration: $key"
               exit 1
@@ -142,9 +141,7 @@ jobs:
 
       - name: Check migrated schema and RPC permissions
         env:
-          STAGING_SCHEMA_DATABASE_URL: ${{ secrets.STAGING_SCHEMA_DATABASE_URL }}
+          STAGING_DB_MIGRATION_URL: ${{ secrets.STAGING_DB_MIGRATION_URL }}
           STAGING_SCHEMA_DATABASE_CA: ${{ vars.STAGING_SCHEMA_DATABASE_CA }}
           STAGING_SUPABASE_PROJECT_REF: ${{ vars.STAGING_SUPABASE_PROJECT_REF }}
-        run: |
-          export NEXT_PUBLIC_SUPABASE_URL="https://$STAGING_SUPABASE_PROJECT_REF.supabase.co"
-          node scripts/check-staging-schema.mjs
+        run: node scripts/check-staging-schema.mjs

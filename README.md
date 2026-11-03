@@ -211,7 +211,6 @@ die folgenden Repository-Einstellungen hinterlegen:
 | Variable | `VERCEL_TEAM_ID` | ID des Vercel-Teams |
 | Variable | `STAGING_SUPABASE_PROJECT_REF` | Ref des Staging-Projekts |
 | Secret | `STAGING_DB_MIGRATION_URL` | Staging Session-Pooler-URL mit Benutzer `postgres.<staging-project-ref>` und Datenbankpasswort |
-| Secret | `STAGING_SCHEMA_DATABASE_URL` | Staging Session-Pooler-URL für die lesende Rolle |
 | Variable | `STAGING_SCHEMA_DATABASE_CA` | Vollständiger PEM-Inhalt des Staging-CA-Zertifikats |
 | Secret | `STAGING_SUPABASE_ACCESS_TOKEN` | Erst bei Edge Functions erforderlich |
 
@@ -221,36 +220,10 @@ Migration als angewendet eintragen. Bei leerem Schema spielt der Workflow sie
 ein. Bei einem Abbruch kann der Workflow für den aktuellen Branch erneut
 gestartet werden. Production wird separat umgestellt.
 
-1. Im **Staging**-Supabase-Projekt im SQL Editor eine eigene Login-Rolle
-   mit einem starken, eindeutigen Passwort anlegen:
+Den Session-Pooler-Host findest du im Staging-Projekt unter **Connect**.
+Sonderzeichen im Datenbankpasswort müssen URL-kodiert sein. Das CA-Zertifikat
+gibt es unter **Database Settings → SSL Configuration**. Hinterlege den
+vollständigen PEM-Text in GitHub. Die Schemaprüfung verwendet denselben
+Zugang wie `supabase db push` in einer Read-only-Transaktion.
 
-   ```sql
-   create role folio_schema_check login password '<eigenes starkes Passwort>';
-   grant usage on schema extensions, storage to folio_schema_check;
-   grant select (id, public, file_size_limit, allowed_mime_types)
-     on storage.buckets to folio_schema_check;
-   ```
-
-   Die Rolle benötigt Sicht auf den Bucket `documents`. Falls für
-   `storage.buckets` Row Level Security aktiv ist, erlaube dieser Rolle
-   ausschließlich die Sicht auf diesen Bucket:
-
-   ```sql
-   create policy folio_schema_check_documents on storage.buckets
-     for select to folio_schema_check using (id = 'documents');
-   ```
-
-2. In Supabase unter **Connect** den Host des **Session pooler** kopieren.
-   In GitHub das Secret `STAGING_SCHEMA_DATABASE_URL` setzen. URL-encode Sonderzeichen im Passwort:
-
-   ```text
-   postgresql://folio_schema_check.<staging-project-ref>:<url-encoded-password>@<session-pooler-host>:5432/postgres
-   ```
-
-3. In Supabase unter **Database Settings → SSL Configuration** das
-   CA-Zertifikat des Staging-Projekts herunterladen. Den vollständigen
-   PEM-Inhalt inklusive `BEGIN CERTIFICATE` und `END CERTIFICATE` in GitHub
-   als Variable `STAGING_SCHEMA_DATABASE_CA` speichern.
-   Die Verbindung prüft das Zertifikat und den Hostnamen.
-
-4. Unter **GitHub → Actions → Staging release** das Ergebnis prüfen.
+Unter **GitHub → Actions → Staging release** steht das Ergebnis.
