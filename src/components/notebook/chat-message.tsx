@@ -1,8 +1,9 @@
+import { memo } from "react";
 import { chatStatusLabels, type ChatStatus } from "@/lib/chat-stream";
 import { FileText, Layers2, Loader2 } from "lucide-react";
 import type { Citation, Message } from "@/lib/types";
 import { Markdown } from "../markdown";
-export function ChatMessage({
+export const ChatMessage = memo(function ChatMessage({
   message: m,
   onCitation,
   status = "retrieving",
@@ -36,7 +37,10 @@ export function ChatMessage({
           {m.citations.map((c) => (
             <button
               key={c.id}
-              onClick={() => onCitation(c)}
+              onClick={(event) => {
+                event.currentTarget.focus();
+                onCitation(c);
+              }}
               title={c.excerpt}
               className="flex max-w-full items-center gap-1.5 rounded-lg border border-[#e0e8d9] bg-[#f8faf5] px-2 py-1.5 text-[9px] text-[#6c805e]"
             >
@@ -49,4 +53,4 @@ export function ChatMessage({
       )}
     </div>
   );
-}
+});

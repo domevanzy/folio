@@ -114,7 +114,7 @@ h3 {
 .workspace {
   height: calc(100dvh - 89px);
   display: grid;
-  grid-template-columns: 280px minmax(320px, 1fr) 280px;
+  grid-template-columns: 280px minmax(320px, 1fr) 216px;
   gap: 12px;
   padding: 0 18px 18px;
 }
@@ -128,7 +128,7 @@ h3 {
 }
 @media (min-width: 1500px) {
   .workspace {
-    grid-template-columns: 310px minmax(400px, 1fr) 310px;
+    grid-template-columns: 310px minmax(400px, 1fr) 224px;
     max-width: 1800px;
     margin: auto;
   }

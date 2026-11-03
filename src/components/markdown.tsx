@@ -25,9 +25,13 @@ export function Markdown({
             const citation = citations.find((c) => c.id === id);
             return citation ? (
               <button
-                onClick={() => onCitation(citation)}
+                onClick={(event) => {
+                  event.currentTarget.focus();
+                  onCitation(citation);
+                }}
+                aria-label={`Beleg ${citation.id.slice(1)}: ${citation.name}, Seite ${citation.page}`}
                 title={`${citation.name}, Seite ${citation.page}`}
-                className="mx-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-[#e5eddc] px-1 text-[10px] font-semibold text-[#4d6b39]"
+                className="mx-0.5 inline-flex h-7 min-w-7 items-center justify-center rounded-md bg-[#e5eddc] px-1 text-xs font-semibold text-[#4d6b39] focus-visible:outline-2 focus-visible:outline-offset-2"
               >
                 {citation.id.slice(1)}
               </button>

@@ -49,6 +49,8 @@ export function Dashboard({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [menu, setMenu] = useState<string | null>(null);
+  const showHero = !email || (!loadError && notebooks.length === 0);
+  const LibraryHeading = showHero ? "h2" : "h1";
   const filtered = notebooks.filter((n) =>
     n.title.toLowerCase().includes(search.toLowerCase()),
   );
@@ -84,76 +86,77 @@ export function Dashboard({
         </div>
       </header>
       <main className="mx-auto max-w-[1284px] px-6 pb-12 md:px-12">
-        <section className="relative mt-7 overflow-hidden rounded-[28px] border border-[#dce4d3] bg-[#edf2e5] px-7 py-11 md:px-11 md:py-12">
-          <div className="relative z-10 max-w-[650px]">
-            <p className="mb-5 text-[10px] font-semibold tracking-[.2em] text-[#63785b]">
-              WENIGER SUCHEN. MEHR VERSTEHEN.
-            </p>
-            <h1 className="serif text-[42px] leading-[1.1] md:text-[54px]">
-              Aus Dokumenten
-              <br />
-              werden{" "}
-              <span className="italic text-[#698254]">Erkenntnisse.</span>
-            </h1>
-            <p className="mt-5 max-w-[430px] text-sm leading-7 text-[#657160]">
-              Ein Ort für deine Quellen, Fragen und nächsten Ideen.
-              <br className="desktop-only" /> Entdecke, was in deinem Wissen
-              steckt.
-            </p>
-            <Button
-              className="mt-7"
-              onClick={() =>
-                email
-                  ? open("create")
-                  : document
-                      .getElementById("start")
-                      ?.scrollIntoView({ behavior: "smooth" })
-              }
+        {showHero && (
+          <section className="relative mt-7 overflow-hidden rounded-[28px] border border-[#dce4d3] bg-[#edf2e5] px-7 py-11 md:px-11 md:py-12">
+            <div className="relative z-10 max-w-[650px]">
+              <h1 className="serif text-[42px] leading-[1.1] md:text-[54px]">
+                Aus Dokumenten
+                <br />
+                werden{" "}
+                <span className="italic text-[#698254]">Erkenntnisse.</span>
+              </h1>
+              <p className="mt-5 max-w-[430px] text-sm leading-7 text-[#657160]">
+                Ein Ort für deine Quellen, Fragen und nächsten Ideen.
+                <br className="desktop-only" /> Entdecke, was in deinem Wissen
+                steckt.
+              </p>
+              <Button
+                className="mt-7"
+                onClick={() =>
+                  email
+                    ? open("create")
+                    : document
+                        .getElementById("start")
+                        ?.scrollIntoView({ behavior: "smooth" })
+                }
+              >
+                {email ? <Plus size={17} /> : <ArrowRight size={17} />}{" "}
+                {email ? "Notebook erstellen" : "Deinen Wissensraum öffnen"}
+              </Button>
+            </div>
+            <div
+              aria-hidden
+              className="desktop-only absolute -right-4 top-0 flex h-full w-[40%] items-center justify-center"
             >
-              {email ? <Plus size={17} /> : <ArrowRight size={17} />}{" "}
-              {email ? "Notebook erstellen" : "Deinen Wissensraum öffnen"}
-            </Button>
-          </div>
-          <div
-            aria-hidden
-            className="desktop-only absolute -right-4 top-0 flex h-full w-[40%] items-center justify-center"
-          >
-            <div className="dot-grid absolute inset-6 opacity-40" />
-            <div className="absolute h-48 w-40 rotate-[-16deg] rounded-2xl border border-[#c6d2bb] bg-[#dce7cf]" />
-            <div className="absolute h-48 w-40 rotate-[12deg] rounded-2xl border border-[#cdd7c3] bg-[#f8faf4] shadow-lg" />
-            <div className="relative flex h-48 w-40 rotate-[-4deg] flex-col rounded-2xl border border-white bg-white px-6 py-6 shadow-xl shadow-[#41552c]/10">
-              <span className="mb-6 text-[#7e9864]">
-                <BookOpen size={32} />
-              </span>
-              <div className="h-2 w-20 rounded bg-[#dfe7d4]" />
-              <div className="mt-3 h-1.5 w-24 rounded bg-[#edf0e7]" />
-              <div className="mt-2 h-1.5 w-16 rounded bg-[#edf0e7]" />
-              <span className="mt-auto text-[9px] tracking-wider text-[#8c9784]">
-                IDEEN BEGINNEN HIER
+              <div className="dot-grid absolute inset-6 opacity-40" />
+              <div className="absolute h-48 w-40 rotate-[-16deg] rounded-2xl border border-[#c6d2bb] bg-[#dce7cf]" />
+              <div className="absolute h-48 w-40 rotate-[12deg] rounded-2xl border border-[#cdd7c3] bg-[#f8faf4] shadow-lg" />
+              <div className="relative flex h-48 w-40 rotate-[-4deg] flex-col rounded-2xl border border-white bg-white px-6 py-6 shadow-xl shadow-[#41552c]/10">
+                <span className="mb-6 text-[#7e9864]">
+                  <BookOpen size={32} />
+                </span>
+                <div className="h-2 w-20 rounded bg-[#dfe7d4]" />
+                <div className="mt-3 h-1.5 w-24 rounded bg-[#edf0e7]" />
+                <div className="mt-2 h-1.5 w-16 rounded bg-[#edf0e7]" />
+                <span className="mt-auto text-[9px] tracking-wider text-[#8c9784]">
+                  IDEEN BEGINNEN HIER
+                </span>
+              </div>
+              <span className="absolute right-12 top-10 flex size-12 items-center justify-center rounded-2xl bg-[#dae6cc] text-[#637b50]">
+                <Quote size={21} />
               </span>
             </div>
-            <span className="absolute right-12 top-10 flex size-12 items-center justify-center rounded-2xl bg-[#dae6cc] text-[#637b50]">
-              <Quote size={21} />
-            </span>
-          </div>
-        </section>
+          </section>
+        )}
         <div
           id="start"
           className="mt-11 flex flex-wrap items-center justify-between gap-4"
         >
           <div>
-            <h2 className="text-2xl font-medium">
+            <LibraryHeading className="serif text-3xl font-medium">
               Deine Notebooks{" "}
               <span className="ml-2 align-middle text-sm muted">
-                {notebooks.length.toString().padStart(2, "0")}
+                {notebooks.length}
               </span>
-            </h2>
-            <p className="muted mt-1.5 text-xs">
-              Große Gedanken brauchen einen guten Anfang.
-            </p>
+            </LibraryHeading>
           </div>
           {email && (
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              {!showHero && (
+                <Button onClick={() => open("create")}>
+                  <Plus size={17} /> Notebook erstellen
+                </Button>
+              )}
               <div className="flex h-9 items-center gap-2 rounded-lg border border-[#e1e5dc] bg-white px-3">
                 <Search size={14} className="muted" />
                 <input
@@ -234,18 +237,6 @@ export function Dashboard({
             <div
               className={`mt-7 grid gap-4 ${list ? "grid-cols-1" : "sm:grid-cols-2 lg:grid-cols-3"}`}
             >
-              <button
-                onClick={() => open("create")}
-                className="group flex min-h-48 flex-col items-center justify-center rounded-[20px] border border-dashed border-[#bdcbb3] bg-[#f1f5eb]/50 p-6 transition-colors hover:bg-[#e9f0df]"
-              >
-                <span className="mb-3 flex size-10 items-center justify-center rounded-full bg-white text-[#6f885b] shadow-sm">
-                  <Plus size={22} />
-                </span>
-                <span className="text-sm font-medium">Neues Notebook</span>
-                <span className="muted mt-1.5 text-xs">
-                  Eine neue Idee beginnt hier
-                </span>
-              </button>
               {filtered.map((n, i) => (
                 <article
                   key={n.id}
