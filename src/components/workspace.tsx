@@ -82,6 +82,7 @@ export function Workspace({
   const sourceUploadInProgress = useRef(false);
   const [sourceErrors, setSourceErrors] = useState<string[]>([]);
   const uploading = pendingSources.length > 0;
+  const sourceCount = sources.length + pendingSources.length;
   const [error, setError] = useState("");
   const [drag, setDrag] = useState(false);
   const [tab, setTab] = useState("chat");
@@ -104,10 +105,10 @@ export function Workspace({
     bottom.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
   useEffect(() => {
-    if (!sources.some((s) => s.status === "processing")) return;
+    if (uploading || !sources.some((s) => s.status === "processing")) return;
     const timer = setInterval(() => router.refresh(), 8000);
     return () => clearInterval(timer);
-  }, [sources, router]);
+  }, [sources, router, uploading]);
   function upload(files: FileList) {
     void addSources(
       Array.from(files, (file) => ({ name: file.name, body: file })),
@@ -281,8 +282,7 @@ export function Workspace({
               {notebook.title}
             </h1>
             <p className="muted mt-1 text-[10px]">
-              {sources.length + pendingSources.length} Quellen · Privates
-              Notebook
+              {sourceCount} Quellen · Privates Notebook
             </p>
           </div>
         </div>
@@ -337,7 +337,7 @@ export function Workspace({
         >
           <PanelHeader icon={PanelLeft} title="Quellen">
             <span className="muted rounded-md bg-[#f2f4f6] px-2 py-0.5 text-[10px]">
-              {sources.length}
+              {sourceCount}
             </span>
           </PanelHeader>
           <div className="p-4">
