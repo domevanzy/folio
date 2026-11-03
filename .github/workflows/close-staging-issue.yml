@@ -1,0 +1,38 @@
+name: Close staging issue
+
+on:
+  pull_request_target:
+    branches: [staging]
+    types: [closed]
+
+permissions:
+  issues: write
+
+jobs:
+  close-issue:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Close the primary issue
+        run: |
+          issue=$(jq -r '
+            .pull_request |
+            (.title | capture("^(feat|fix|chore|docs)\\\\(#(?<issue>[1-9][0-9]*)\\\\): .{8,120}$") | .issue) as $issue |
+            select((.body // "") | test("\\\\bCloses\\\\s+#" + $issue + "\\\\b"; "i")) |
+            $issue
+          ' "$GITHUB_EVENT_PATH")
+          if [[ -z "$issue" ]]; then
+            echo "No primary issue linked in the PR title and description."
+            exit 0
+          fi
+          record=$(gh api "repos/$GITHUB_REPOSITORY/issues/$issue")
+          if jq -e 'has("pull_request")' <<< "$record" >/dev/null; then
+            echo "::error::#$issue is a pull request, not an issue."
+            exit 1
+          fi
+          if [[ $(jq -r .state <<< "$record") == open ]]; then
+            gh issue close "$issue" --repo "$GITHUB_REPOSITORY" --reason completed
+          fi

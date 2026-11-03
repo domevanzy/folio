@@ -9,6 +9,12 @@ Verbindliche Reihenfolge: **Issue → PR → Tests → Merge**.
 
 Bei einem vollständig leeren Repository ist einmalig ein minimaler Start-Commit auf `main` nötig, um einen PR gegen diesen Branch eröffnen zu können. Dieser Commit enthält ausschließlich `.gitignore`; der Anwendungscode folgt über einen PR.
 
+## Issues nach Staging-Merges
+
+Nach einem Merge nach `staging` schließt GitHub Actions das primäre Issue,
+wenn PR-Titel und `Closes #N` dieselbe Issue-Nummer enthalten.
+Ein ohne Merge geschlossener PR lässt das Issue offen.
+
 ## Namensschema
 
 | Gegenstand        | Schema                              | Beispiel                                               |
