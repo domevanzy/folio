@@ -36,7 +36,7 @@ export default async function NotebookPage({
         Array<Omit<Source, "kind"> & { kind?: Source["kind"] }>,
         { merge: false }
       >();
-  let [sources, messages] = await Promise.all([
+  const [initialSources, messages] = await Promise.all([
     listSources(`${sourceFields},kind`),
     db
       .from("messages")
@@ -45,8 +45,9 @@ export default async function NotebookPage({
       .order("created_at", { ascending: false })
       .limit(100),
   ]);
-  if (missingSourceKind(sources.error))
-    sources = await listSources(sourceFields);
+  const sources = missingSourceKind(initialSources.error)
+    ? await listSources(sourceFields)
+    : initialSources;
   if (sources.error || messages.error)
     throw new Error("Notebook-Inhalte konnten nicht geladen werden.");
   return (
