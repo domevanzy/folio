@@ -71,66 +71,81 @@ export async function answer(
     );
     if (sources?.length !== new Set(body.sourceIds).size)
       throw new HttpError(400, "Mindestens eine Quelle ist nicht verfügbar.");
-    let rows: { source_id: string; page_number: number; content: string }[];
-    if (summary) {
-      const { data } = checked(
+    const findRows = async () => {
+      let rows: { source_id: string; page_number: number; content: string }[];
+      if (summary) {
+        const { data } = checked(
+          await db
+            .from("document_chunks")
+            .select("source_id,page_number,content,chunk_index")
+            .eq("notebook_id", notebookId)
+            .eq("user_id", user.id)
+            .in("source_id", body.sourceIds)
+            .order("chunk_index")
+            .limit(9600)
+            .abortSignal(signal),
+        );
+        const groups = sources.map((s) =>
+          (data || []).filter((c) => c.source_id === s.id),
+        );
+        rows = [];
+        for (let i = 0; i < 5; i++)
+          for (const group of groups) {
+            if (group.length && rows.length < 40) {
+              const row =
+                group[Math.floor((i * Math.max(0, group.length - 1)) / 4)];
+              if (!rows.includes(row)) rows.push(row);
+            }
+          }
+      } else
+        rows = await retrieve(
+          db,
+          notebookId,
+          body.sourceIds,
+          await embedQuery(question, signal),
+          signal,
+        );
+      return rows;
+    };
+    const loadConversation = async () => {
+      const { data: conversation } = checked(
         await db
-          .from("document_chunks")
-          .select("source_id,page_number,content,chunk_index")
+          .from("conversations")
+          .upsert(
+            { notebook_id: notebookId, user_id: user.id },
+            { onConflict: "notebook_id" },
+          )
+          .select("id")
+          .abortSignal(signal)
+          .single(),
+      );
+      if (!conversation) throw new Error("Conversation missing");
+      const { data: history } = checked(
+        await db
+          .from("messages")
+          .select("role,content")
+          .eq("conversation_id", conversation.id)
           .eq("notebook_id", notebookId)
           .eq("user_id", user.id)
-          .in("source_id", body.sourceIds)
-          .order("chunk_index")
-          .limit(9600)
+          .order("created_at", { ascending: false })
+          .limit(8)
           .abortSignal(signal),
       );
-      const groups = sources.map((s) =>
-        (data || []).filter((c) => c.source_id === s.id),
-      );
-      rows = [];
-      for (let i = 0; i < 5; i++)
-        for (const group of groups) {
-          if (group.length && rows.length < 40) {
-            const row =
-              group[Math.floor((i * Math.max(0, group.length - 1)) / 4)];
-            if (!rows.includes(row)) rows.push(row);
-          }
-        }
-    } else
-      rows = await retrieve(
-        db,
-        notebookId,
-        body.sourceIds,
-        await embedQuery(question, signal),
-        signal,
-      );
+      return { conversation, history };
+    };
+    // Wait for both operations before releasing the request slot on failure.
+    const [sourceRows, chat] = await Promise.allSettled([
+      findRows(),
+      loadConversation(),
+    ]);
+    if (sourceRows.status === "rejected") throw sourceRows.reason;
+    if (chat.status === "rejected") throw chat.reason;
+    const rows = sourceRows.value;
+    const { conversation, history } = chat.value;
     const { citations, context } = makeContext(
       rows,
       new Map(sources.map((s) => [s.id, s.name])),
       new Map(sources.map((s) => [s.id, s.kind ?? "pdf"])),
-    );
-    const { data: conversation } = checked(
-      await db
-        .from("conversations")
-        .upsert(
-          { notebook_id: notebookId, user_id: user.id },
-          { onConflict: "notebook_id" },
-        )
-        .select("id")
-        .abortSignal(signal)
-        .single(),
-    );
-    if (!conversation) throw new Error("Conversation missing");
-    const { data: history } = checked(
-      await db
-        .from("messages")
-        .select("role,content")
-        .eq("conversation_id", conversation.id)
-        .eq("notebook_id", notebookId)
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(8)
-        .abortSignal(signal),
     );
     checked(
       await db.from("messages").insert({
