@@ -20,7 +20,7 @@ export function PasswordReset() {
   const [error, setError] = useState("");
   return (
     <div className="panel p-7">
-      <LockKeyhole size={25} className="mb-5 text-[#71865f]" />
+      <LockKeyhole size={25} className="mb-5 text-[#596d8c]" />
       <h1 className="text-xl font-semibold">Neues Passwort festlegen</h1>
       <p className="muted mt-2 text-sm leading-relaxed">
         Wähle ein Passwort, mit dem du dich künftig direkt anmelden kannst.

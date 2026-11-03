@@ -1,7 +1,9 @@
 "use client";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+
 import type { Citation } from "@/lib/types";
+
 export function Markdown({
   text,
   citations,
@@ -11,9 +13,11 @@ export function Markdown({
   citations: Citation[];
   onCitation: (citation: Citation) => void;
 }) {
-  const allowed = new Set(citations.map((c) => c.id));
-  const marked = text.replace(/\[(C\d+)\]/g, (token, id) =>
-    allowed.has(id) ? `[${id}](#cite-${id})` : token,
+  const citationIndexes = new Map(
+    citations.map(({ id }, index) => [id, index]),
+  );
+  const marked = text.replace(/\[(C\d+)\]/g, (token, id: string) =>
+    citationIndexes.has(id) ? `[${id}](#cite-${id})` : token,
   );
   return (
     <div className="markdown">
@@ -21,22 +25,24 @@ export function Markdown({
         remarkPlugins={[remarkGfm]}
         components={{
           a: ({ href, children }) => {
-            const id = href?.startsWith("#cite-") ? href.slice(6) : null;
-            const citation = citations.find((c) => c.id === id);
-            return citation ? (
+            const index = href?.startsWith("#cite-")
+              ? citationIndexes.get(href.slice(6))
+              : undefined;
+            if (index === undefined) return <span>{children}</span>;
+
+            const citation = citations[index];
+            return (
               <button
+                type="button"
                 onClick={(event) => {
                   event.currentTarget.focus();
                   onCitation(citation);
                 }}
-                aria-label={`Beleg ${citation.id.slice(1)}: ${citation.name}, Seite ${citation.page}`}
-                title={`${citation.name}, Seite ${citation.page}`}
-                className="mx-0.5 inline-flex h-7 min-w-7 items-center justify-center rounded-md bg-[#e5eddc] px-1 text-xs font-semibold text-[#4d6b39] focus-visible:outline-2 focus-visible:outline-offset-2"
+                aria-label={`Quelle ${index + 1}: ${citation.name}${citation.kind === "text" || citation.kind === "web" ? "" : `, Seite ${citation.page}`}`}
+                className="mx-0.5 inline-flex min-h-6 items-center rounded px-0.5 text-xs font-semibold tabular-nums text-neutral-700 hover:bg-neutral-100 focus-visible:outline-2"
               >
-                {citation.id.slice(1)}
+                [{index + 1}]
               </button>
-            ) : (
-              <span>{children}</span>
             );
           },
           img: () => null,
