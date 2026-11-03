@@ -40,13 +40,14 @@ async function checkStagingSchema() {
   }
 
   const sql = await readFile(new URL("./check-staging-schema.sql", import.meta.url), "utf8");
+  const ca = process.env.STAGING_SCHEMA_DATABASE_CA?.trim();
   const client = new pg.Client({
     host: database.hostname,
     port: 5432,
     database: "postgres",
     user: username,
     password: decodeURIComponent(database.password),
-    ssl: { rejectUnauthorized: true },
+    ssl: { rejectUnauthorized: true, ca },
     connectionTimeoutMillis: 10_000,
     query_timeout: 10_000,
   });
@@ -57,6 +58,9 @@ async function checkStagingSchema() {
     await client.query("begin read only");
     ({ rows } = await client.query(sql));
   } catch (error) {
+    if (error.code === "SELF_SIGNED_CERT_IN_CHAIN" && !ca) {
+      throw new Error("Supabase-CA-Zertifikat als STAGING_SCHEMA_DATABASE_CA für Preview → staging setzen.");
+    }
     const code = /^[A-Z0-9_]+$/.test(error.code ?? "") ? ` (${error.code})` : "";
     throw new Error(`Datenbankprüfung fehlgeschlagen${code}. Zugang und Leserechte prüfen.`);
   } finally {
