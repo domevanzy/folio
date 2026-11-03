@@ -10,7 +10,7 @@ export function PanelHeader({
   children?: ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between border-b border-[#eef0ea] px-5 py-5">
+    <div className="flex items-center justify-between border-b border-[#eaecf0] px-5 py-5">
       <h2 className="flex items-center gap-2 text-sm font-semibold">
         <Icon size={16} />
         {title}

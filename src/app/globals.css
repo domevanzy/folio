@@ -1,10 +1,10 @@
 @import "tailwindcss";
 :root {
-  --background: #f8f9f5;
-  --foreground: #26382f;
+  --background: #f5f7f9;
+  --foreground: #252d39;
   --radius: 0.75rem;
-  --border: #e0e5dc;
-  --primary: #253f35;
+  --border: #dce0e5;
+  --primary: #232f41;
   --primary-foreground: #fff;
 }
 * {
@@ -35,7 +35,7 @@ textarea {
 }
 input:focus,
 textarea:focus {
-  box-shadow: 0 0 0 2px #779f7e;
+  box-shadow: 0 0 0 2px #7186a5;
 }
 a,
 button,
@@ -44,7 +44,7 @@ textarea {
   outline-offset: 4px;
 }
 ::selection {
-  background: #d4e7c3;
+  background: #c2d1e8;
 }
 h1,
 h2,
@@ -56,7 +56,7 @@ h3 {
   font-weight: 400;
 }
 .panel {
-  border: 1px solid #e0e5dc;
+  border: 1px solid var(--border);
   border-radius: 20px;
   background: #fff;
 }
@@ -85,7 +85,7 @@ h3 {
 }
 .markdown pre {
   overflow: auto;
-  background: #f4f5f0;
+  background: #f0f2f5;
   border-radius: 10px;
   padding: 12px;
 }
@@ -103,18 +103,19 @@ h3 {
   padding: 8px;
 }
 .markdown blockquote {
-  border-left: 3px solid #a8c294;
+  border-left: 3px solid #91a6c5;
   padding-left: 12px;
-  color: #647067;
+  color: #536581;
 }
 .dot-grid {
-  background-image: radial-gradient(#a5b79e 1px, transparent 1px);
+  background-image: radial-gradient(#98a7bd 1px, transparent 1px);
   background-size: 18px 18px;
 }
 .workspace {
+  --workspace-sidebar-width: clamp(280px, 25vw, 350px);
   height: calc(100dvh - 89px);
   display: grid;
-  grid-template-columns: 280px minmax(320px, 1fr) 216px;
+  grid-template-columns: var(--workspace-sidebar-width) minmax(320px, 1fr) var(--workspace-sidebar-width);
   gap: 12px;
   padding: 0 18px 18px;
 }
@@ -128,7 +129,7 @@ h3 {
 }
 @media (min-width: 1500px) {
   .workspace {
-    grid-template-columns: 310px minmax(400px, 1fr) 224px;
+    grid-template-columns: var(--workspace-sidebar-width) minmax(400px, 1fr) var(--workspace-sidebar-width);
     max-width: 1800px;
     margin: auto;
   }

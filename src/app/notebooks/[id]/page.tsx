@@ -1,8 +1,9 @@
 import { redirect, notFound } from "next/navigation";
 import { configured } from "@/lib/config";
 import { supabase } from "@/lib/supabase/server";
+import type { Source } from "@/lib/types";
 import { Workspace } from "@/components/workspace";
-import { uuid } from "@/lib/http";
+import { missingSourceKind, uuid } from "@/lib/http";
 export const dynamic = "force-dynamic";
 export default async function NotebookPage({
   params,
@@ -24,12 +25,19 @@ export default async function NotebookPage({
     .eq("user_id", user.id)
     .single();
   if (!notebook) notFound();
-  const [sources, messages] = await Promise.all([
+  const sourceFields = "id,name,status,page_count,error,created_at";
+  const listSources = (fields: string) =>
     db
       .from("sources")
-      .select("id,name,status,page_count,error,created_at")
+      .select(fields)
       .eq("notebook_id", id)
-      .order("created_at"),
+      .order("created_at")
+      .overrideTypes<
+        Array<Omit<Source, "kind"> & { kind?: Source["kind"] }>,
+        { merge: false }
+      >();
+  let [sources, messages] = await Promise.all([
+    listSources(`${sourceFields},kind`),
     db
       .from("messages")
       .select("id,role,content,citations")
@@ -37,12 +45,17 @@ export default async function NotebookPage({
       .order("created_at", { ascending: false })
       .limit(100),
   ]);
+  if (missingSourceKind(sources.error))
+    sources = await listSources(sourceFields);
   if (sources.error || messages.error)
     throw new Error("Notebook-Inhalte konnten nicht geladen werden.");
   return (
     <Workspace
       notebook={notebook}
-      initialSources={sources.data || []}
+      initialSources={(sources.data || []).map((source) => ({
+        ...source,
+        kind: source.kind ?? "pdf",
+      }))}
       initialMessages={(messages.data || []).reverse()}
     />
   );

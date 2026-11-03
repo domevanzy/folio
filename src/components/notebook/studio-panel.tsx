@@ -18,13 +18,13 @@ export function StudioPanel({
         <button
           onClick={onSummarize}
           disabled={disabled}
-          className="group w-full rounded-2xl border border-[#dfe8d5] bg-[#edf3e6] p-4 text-left transition-colors hover:bg-[#e2ecd7] disabled:opacity-50"
+          className="group w-full rounded-2xl border border-[#d6dde7] bg-[#e7ebf2] p-4 text-left transition-colors hover:bg-[#d9e0ea] disabled:opacity-50"
         >
-          <span className="mb-5 flex size-9 items-center justify-center rounded-xl bg-white/70 text-[#738c5c]">
+          <span className="mb-5 flex size-9 items-center justify-center rounded-xl bg-white/70 text-[#596f8f]">
             <BookOpen size={18} />
           </span>
           <h3 className="text-sm font-semibold">Zusammenfassung</h3>
-          <p className="mt-2 text-xs leading-5 text-[#4b5c44]">
+          <p className="mt-2 text-xs leading-5 text-[#3e4c62]">
             Fasst ausgewählte Textstellen zusammen und speichert das Ergebnis im
             Chat.
           </p>

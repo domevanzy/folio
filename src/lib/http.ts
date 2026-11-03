@@ -102,8 +102,17 @@ export async function readLimited(request: Request, maxBytes: number) {
   }
   return bytes;
 }
-export async function readJson(request: Request): Promise<unknown> {
+export async function readJson(
+  request: Request,
+  maxBytes = 20 * 1024,
+): Promise<unknown> {
   return JSON.parse(
-    new TextDecoder().decode(await readLimited(request, 20 * 1024)),
+    new TextDecoder().decode(await readLimited(request, maxBytes)),
   );
+}
+
+export function missingSourceKind(
+  error: { code: string; message: string } | null,
+) {
+  return error?.code === "42703" && error.message.includes("sources.kind");
 }

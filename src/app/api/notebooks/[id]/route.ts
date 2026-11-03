@@ -22,7 +22,7 @@ export async function DELETE(request: Request, { params }: Params) {
     );
     await removeDocumentFiles(
       db,
-      (data || []).map((s) => s.storage_path),
+      (data || []).flatMap((s) => (s.storage_path ? [s.storage_path] : [])),
     );
     checked(await db.from("notebooks").delete().eq("id", id));
     return Response.json({ ok: true });

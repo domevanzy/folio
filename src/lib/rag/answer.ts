@@ -1,3 +1,5 @@
+import type { SourceKind } from "@/lib/types";
+import { missingSourceKind } from "@/lib/http";
 import {
   encodeChatEvent,
   CHAT_STREAM_CONTENT_TYPE,
@@ -43,14 +45,21 @@ export async function answer(
     const question = summary
       ? "Erstelle eine strukturierte Zusammenfassung der vorliegenden Auszüge. Nenne zentrale Themen, Kernaussagen und offene Fragen. Kennzeichne die Zusammenfassung ausdrücklich als auszugbasiert und möglicherweise unvollständig."
       : body.question!;
-    const { data: sources } = checked(
-      await db
+    const listSources = (fields: string) =>
+      db
         .from("sources")
-        .select("id,name")
+        .select(fields)
         .eq("notebook_id", notebookId)
         .eq("status", "ready")
         .in("id", body.sourceIds)
-        .abortSignal(signal),
+        .abortSignal(signal)
+        .overrideTypes<
+          Array<{ id: string; name: string; kind?: SourceKind }>,
+          { merge: false }
+        >();
+    const result = await listSources("id,name,kind");
+    const { data: sources } = checked(
+      missingSourceKind(result.error) ? await listSources("id,name") : result,
     );
     if (sources?.length !== new Set(body.sourceIds).size)
       throw new HttpError(400, "Mindestens eine Quelle ist nicht verfügbar.");
@@ -89,6 +98,7 @@ export async function answer(
     const { citations, context } = makeContext(
       rows,
       new Map(sources.map((s) => [s.id, s.name])),
+      new Map(sources.map((s) => [s.id, s.kind ?? "pdf"])),
     );
     const { data: conversation } = checked(
       await db
@@ -164,12 +174,10 @@ export async function answer(
           const content = await generateGroundedAnswer({
             question,
             context,
-            history: (history || [])
-              .reverse()
-              .map((m) => ({
-                role: m.role as "user" | "assistant",
-                content: m.content,
-              })),
+            history: (history || []).reverse().map((m) => ({
+              role: m.role as "user" | "assistant",
+              content: m.content,
+            })),
             citations,
             signal,
             onText: (text) => send({ type: "text", text }),

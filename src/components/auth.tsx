@@ -59,14 +59,14 @@ export function Auth({
   }
   return (
     <div className="panel p-7">
-      <span className="mb-5 flex size-11 items-center justify-center rounded-xl bg-[#edf2e7]">
+      <span className="mb-5 flex size-11 items-center justify-center rounded-xl bg-[#e8ecf1]">
         <LockKeyhole size={21} />
       </span>
       <h2 className="text-xl font-semibold">{copy[mode].title}</h2>
       <p className="muted mt-2 leading-relaxed">{copy[mode].description}</p>
       {mode !== "recover" && (
         <div
-          className="mt-5 grid grid-cols-2 gap-1 rounded-xl bg-[#f1f4ec] p-1"
+          className="mt-5 grid grid-cols-2 gap-1 rounded-xl bg-[#edeff3] p-1"
           aria-label="Zugang wählen"
         >
           {(["login", "register"] as const).map((value) => (
@@ -174,7 +174,7 @@ export function Auth({
         {message && (
           <p
             role="status"
-            className="rounded-xl bg-[#edf3e6] p-3 text-xs leading-relaxed"
+            className="rounded-xl bg-[#e7ebf2] p-3 text-xs leading-relaxed"
           >
             {message}
           </p>
