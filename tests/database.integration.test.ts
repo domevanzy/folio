@@ -37,7 +37,11 @@ beforeAll(async () => {
  grant usage on schema public,auth,storage,extensions to authenticated,anon;
  grant select,insert,delete on storage.objects to authenticated;
  `);
-  for (const migration of ["001_folio.sql", "002_source_types.sql"]) {
+  for (const migration of [
+    "001_folio.sql",
+    "002_source_types.sql",
+    "003_resource_limits.sql",
+  ]) {
     await db.exec(
       await readFile(
         new URL(`../supabase/migrations/${migration}`, import.meta.url),
@@ -213,4 +217,51 @@ it("checks staging schema as the build role and reports a missing RPC", async ()
   } finally {
     await db.exec("rollback");
   }
+});
+
+it("enforces the notebook quota on direct authenticated inserts", async () => {
+  await actAs(other);
+  await expect(
+    db.query(
+      "insert into public.notebooks(user_id,title) select $1, 'Quota test' from generate_series(1, 100)",
+      [other],
+    ),
+  ).rejects.toMatchObject({ code: "PT429" });
+  expect((await db.query("select id from public.notebooks")).rows).toHaveLength(
+    1,
+  );
+});
+
+it("keeps job slots private, independent, and recoverable", async () => {
+  const acquire = async (kind: string) =>
+    (
+      await db.query<{ token: string | null }>(
+        "select public.acquire_request_slot($1) as token",
+        [kind],
+      )
+    ).rows[0].token;
+  const release = (token: string | null) =>
+    db.query("select public.release_request_slot('model', $1)", [token]);
+
+  await actAs(owner);
+  const token = await acquire("model");
+  expect(token).toBeTruthy();
+  expect(await acquire("model")).toBeNull();
+  expect(await acquire("upload")).toBeTruthy();
+  await actAs(other);
+  await release(token);
+  expect(await acquire("model")).toBeTruthy();
+  await actAs(owner);
+  expect(await acquire("model")).toBeNull();
+  await db.exec(
+    "reset role; update public.request_slots set expires_at = now() - interval '1 second'",
+  );
+  await actAs(owner);
+  const replacement = await acquire("model");
+  expect(replacement).toBeTruthy();
+  expect(replacement).not.toBe(token);
+  await release(token);
+  expect(await acquire("model")).toBeNull();
+  await release(replacement);
+  expect(await acquire("model")).toBeTruthy();
 });

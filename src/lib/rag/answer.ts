@@ -12,6 +12,7 @@ import { chatFailure } from "@/lib/chat-errors";
 import {
   notebookContext,
   rateLimit,
+  acquireRequestSlot,
   checked,
   readJson,
   HttpError,
@@ -36,12 +37,14 @@ export async function answer(
     cancellation.signal,
     AbortSignal.timeout(config.chatRequestTimeoutMs),
   ]);
+  let releaseSlot: (() => Promise<void>) | undefined;
   try {
     const { db, user } = await notebookContext(notebookId, request);
-    await rateLimit(db, summary ? "summary" : "chat");
     const body = schema.parse(await readJson(request));
     if (!summary && !body.question)
       throw new HttpError(400, "Bitte eine Frage eingeben.");
+    releaseSlot = await acquireRequestSlot(db, "model");
+    await rateLimit(db, summary ? "summary" : "chat");
     const question = summary
       ? "Erstelle eine strukturierte Zusammenfassung der vorliegenden Auszüge. Nenne zentrale Themen, Kernaussagen und offene Fragen. Kennzeichne die Zusammenfassung ausdrücklich als auszugbasiert und möglicherweise unvollständig."
       : body.question!;
@@ -159,6 +162,7 @@ export async function answer(
       const saved = await persist(content);
       return Response.json({ content, ...saved });
     }
+    const releaseStreamSlot = releaseSlot;
     const stream = new ReadableStream({
       async start(controller) {
         let connected = true;
@@ -194,13 +198,15 @@ export async function answer(
             error: failed.message + " Die Antwort wurde nicht gespeichert.",
           });
         } finally {
-          if (connected) controller.close();
+          await releaseStreamSlot();
+          if (connected && !cancellation.signal.aborted) controller.close();
         }
       },
       cancel() {
         cancellation.abort();
       },
     });
+    releaseSlot = undefined;
     return new Response(stream, {
       headers: {
         "Content-Type": CHAT_STREAM_CONTENT_TYPE,
@@ -217,5 +223,7 @@ export async function answer(
       return failure(error);
     const failed = chatFailure(signal.aborted ? signal.reason : error);
     return Response.json({ error: failed.message }, { status: failed.status });
+  } finally {
+    await releaseSlot?.();
   }
 }
