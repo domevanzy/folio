@@ -577,9 +577,6 @@ export function Workspace({
         <PdfViewer
           key={viewer.url}
           document={viewer}
-          pageCount={
-            sources.find((s) => s.id === viewer.sourceId)?.page_count || 100
-          }
           onClose={() => {
             viewerSeq.current++;
             setViewer(null);
