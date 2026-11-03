@@ -227,5 +227,11 @@ keine Migrationen oder RPCs aus.
    postgresql://folio_schema_check.<staging-project-ref>:<url-encoded-password>@<session-pooler-host>:5432/postgres
    ```
 
-3. Die Vercel-Systemvariablen aktiviert lassen und den Branch `staging`
+3. In Supabase unter **Database Settings → SSL Configuration** das
+   CA-Zertifikat des Staging-Projekts herunterladen. Den vollständigen
+   PEM-Inhalt inklusive `BEGIN CERTIFICATE` und `END CERTIFICATE` in Vercel
+   als Config `STAGING_SCHEMA_DATABASE_CA` für **Preview → staging** speichern.
+   Die Verbindung prüft das Zertifikat und den Hostnamen.
+
+4. Die Vercel-Systemvariablen aktiviert lassen und den Branch `staging`
    neu deployen. Das Build-Log zeigt das Ergebnis der Prüfung.
